@@ -1,0 +1,16 @@
+version: '3.8'
+
+networks:
+  edge_network:
+
+services:
+  mongodb:
+    image: mongo:4.4
+    container_name: rust_web_mongo-4.4
+    ports:
+      - "27015:27017"
+    volumes:
+      - /db:/data/db
+    # restart: always
+    networks:               # make it use same network to connect ports
+      - edge_network
