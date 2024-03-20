@@ -10,7 +10,7 @@ services:
     ports:
       - "27015:27017"
     volumes:
-      - /db:/data/db
+      - ./db:/data/db
     # restart: always
     networks:               # make it use same network to connect ports
       - edge_network
