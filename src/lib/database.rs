@@ -1,3 +1,5 @@
+use std::clone;
+
 use actix_web::{web, HttpResponse, Responder};
 use mongodb::{
     bson::{self, doc, Bson, Document},
@@ -7,117 +9,45 @@ use mongodb::{
 use serde_json::Value;
 use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize)]
-pub struct OperationResult {
-    status: String,
-    action: String,
-    id: Option<String>, // For the ID of the found/updated/upserted document
-    ack: Option<bool>, // Acknowledgment of operation success
-    document: Option<Value>, // For storing the found document
-}
+// Adjusted to return a Result<Value, String> to better handle success and error states.
+pub async fn aas_find_one(_id: String, collection: Collection<Document>) -> Result<Value, String> {
+    let filter = doc! { "_id": &_id };
 
+    match collection.find_one(filter, None).await {
+        Ok(Some(document)) => {
+            // Optionally remove the _id field from the document if not needed
+            let mut document = document.clone(); // Clone if you need to modify the document.
+            document.remove("_id");
 
-pub async fn update_one(
-// pub fn update_one(
-    db: web::Data<Database>,
-    json_data: web::Json<Value>,
-    collection_name: &str,
-    upsert: bool,
-    _id: &str,
-) -> impl Responder {
-    let collection: Collection<Document> = db.collection(collection_name);
-
-    // Attempt to convert json_data to a BSON Document
-    match bson::to_bson(&*json_data) {
-        Ok(Bson::Document(document)) => {
-            let filter = doc! { "_id": _id };
-            let update = doc! { "$set": document };
-            let options = UpdateOptions::builder().upsert(upsert).build();
-
-            match collection.update_one(filter, update, options).await {
-                Ok(insert_result) => {
-                    if let Some(upserted_id) = insert_result.upserted_id {
-                        let id_str = upserted_id.as_object_id().map(|oid| oid.to_hex());
-                        HttpResponse::Ok().json(OperationResult {
-                            status: "Success".into(),
-                            action: "upserted".into(),
-                            id: id_str,
-                            ack: Some(true),
-                            document: None,
-                        })
-                    } else {
-                        HttpResponse::Ok().json(OperationResult {
-                            status: "Success".into(),
-                            action: "updated".into(),
-                            id: None,
-                            ack: Some(true),
-                            document: None,
-                        })
-                    }
+            match bson::to_bson(&document) {
+                Ok(bson::Bson::Document(doc)) => match bson::from_bson::<Value>(bson::Bson::Document(doc)) {
+                    Ok(json) => Ok(json),
+                    Err(_) => Err("Failed to convert BSON to JSON".into()),
                 },
-                Err(e) => HttpResponse::InternalServerError().json(OperationResult {
-                    status: "Error".into(),
-                    action: "database operation failed".into(),
-                    id: None,
-                    ack: Some(false),
-                    document: None,
-                })
+                _ => Err("Failed to handle BSON document".into()),
             }
         },
-        _ => HttpResponse::BadRequest().json(OperationResult {
-            status: "Error".into(),
-            action: "invalid JSON structure".into(),
-            id: None,
-            ack: Some(false),
-            document: None,
-        })
+        Ok(None) => Err("Document not found".into()),
+        Err(e) => Err(format!("Error finding document: {}", e)),
     }
 }
 
-pub async fn find_one(
-// pub fn find_one(
-    db: web::Data<Database>,
-    collection_name: &str,
-    _id: &str,
-) -> impl Responder {
-    let collection: Collection<Document> = db.collection(collection_name);
+pub async fn aas_update_one(_id: String, collection: Collection<Document>, new_document: Document, upsert: bool) -> Result<String, String> {
+    let filter = doc! { "_id": _id };
+    let options = UpdateOptions::builder().upsert(upsert).build();
 
-    match bson::oid::ObjectId::parse_str(_id) {
-        Ok(oid) => {
-            let filter = doc! { "_id": oid };
-            match collection.find_one(filter, None).await {
-                Ok(Some(document)) => {
-                    let document_json: Value = bson::to_bson(&document).unwrap().into();
-                    HttpResponse::Ok().json(OperationResult {
-                        status: "Success".into(),
-                        action: "found".into(),
-                        id: Some(_id.into()),
-                        ack: Some(true),
-                        document: Some(document_json),
-                    })
-                },
-                Ok(None) => HttpResponse::Ok().json(OperationResult {
-                    status: "Not Found".into(),
-                    action: "find".into(),
-                    id: None,
-                    ack: Some(false),
-                    document: None,
-                }),
-                Err(e) => HttpResponse::InternalServerError().json(OperationResult {
-                    status: "Error".into(),
-                    action: "database operation failed".into(),
-                    id: None,
-                    ack: Some(false),
-                    document: None,
-                }),
+    // Use the '$set' operator for the update, which requires modifying the document structure
+    let update = doc! { "$set": new_document };
+
+    // Perform the update operation
+    match collection.update_one(filter, update, options).await {
+        Ok(update_result) => {
+            if let Some(upserted_id) = update_result.upserted_id {
+                Ok(format!("Document upserted with id: {:?}", upserted_id))
+            } else {
+                Ok("Document updated successfully".into())
             }
         },
-        Err(_) => HttpResponse::BadRequest().json(OperationResult {
-            status: "Error".into(),
-            action: "invalid ID format".into(),
-            id: None,
-            ack: Some(false),
-            document: None,
-        }),
+        Err(e) => Err(format!("Error upserting document: {}", e)),
     }
 }

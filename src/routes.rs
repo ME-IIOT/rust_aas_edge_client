@@ -19,6 +19,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 .route(web::delete().to(handlers::book::delete_book)),
         )
         .service(
-            web::resource(
-                "/database/{id}").route(web::get().to(handlers::database::get_database)));
-}
+            web::resource("/database/{id}")
+                .route(web::get().to(handlers::database::get_database))
+                .route(web::post().to(handlers::database::add_database))
+                .route(web::put().to(handlers::database::update_database)));
+            }

@@ -4,7 +4,7 @@ use mongodb::{Client, options::ClientOptions};
 use std::{convert::TryFrom, error::Error};
 
 
-// include the modules to main
+// GUIDE: include the modules to main
 mod handlers;
 mod routes;
 mod state;
@@ -13,8 +13,10 @@ mod lib;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+
+    // GUIDE: mongodb connection
     let client = Client::with_uri_str("mongodb://localhost:27015").await.unwrap();
-    let client_data = web::Data::new(client.clone());
+    // let client_data = web::Data::new(client.clone());
     let db = client.database("bookshelf");
 
     let shared_data = web::Data::new(state::AppState {
@@ -24,10 +26,13 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            // GUIDE: pass shared data to the app
             .app_data(shared_data.clone())
-            .app_data(web::Data::new(db.clone())) // Pass the MongoDB instance
-            .configure(routes::config) // Configure the routes
+            .app_data(web::Data::new(db.clone()))
+            // GUIDE: Configure the routes
+            .configure(routes::config) 
     })
+
     .bind("127.0.0.1:8080")?
     .run()
     .await
