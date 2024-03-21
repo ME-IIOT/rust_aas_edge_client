@@ -1,28 +1,35 @@
 use actix_web::{web, HttpResponse, Responder};
 use mongodb::{
-    bson::{doc, oid::ObjectId},
+    bson::{doc, oid::ObjectId, Document},
     Database,
 };
 use mongodb::bson;
-use serde_json::json;
+use serde_json::{json, Value};
 use futures_util::stream::TryStreamExt;
 
-// mod lib;
-// use lib::{update_one, find_one, OperationResult};
-use rust_web_mongo::find_one;
+use crate::lib::database::find_one;
 
 pub async fn get_database(db: web::Data<Database>, path: web::Path<(String,)>) -> impl Responder {
     let _id = path.into_inner().0;
-
-    // Define the collection name where you want to search the document.
-    // This should match one of your MongoDB collection names.
     let collection_name = "books";
+    let collection = db.collection::<Document>(collection_name);
 
-    // Call the find_one function with the database, collection name, and _id.
-    // This example assumes find_one is an async function and thus we await its result.
-    match find_one(db, collection_name, &_id).await {
-        // Assuming find_one returns a Result<OperationResult, mongodb::error::Error>
-        Ok(operation_result) => HttpResponse::Ok().json(operation_result),
-        Err(_) => HttpResponse::InternalServerError().json("An error occurred while fetching the document."),
+    match bson::oid::ObjectId::parse_str(&_id) {
+        Ok(oid) => {
+            let filter = doc! { "_id": oid };
+            match collection.find_one(filter, None).await {
+                Ok(Some(mut document)) => {
+                    document.remove("_id");
+                    // Convert BSON document to JSON
+                    let json: Value = bson::from_bson(bson::Bson::Document(document))
+                        .expect("Failed to convert BSON to JSON");
+
+                    HttpResponse::Ok().json(json) // Sending back the JSON response
+                }
+                Ok(None) => HttpResponse::NotFound().body("Document not found"),
+                Err(e) => HttpResponse::InternalServerError().body(format!("Error finding document: {}", e)),
+            }
+        },
+        Err(_) => HttpResponse::BadRequest().body("Invalid ObjectId"),
     }
 }

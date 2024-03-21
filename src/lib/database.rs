@@ -7,9 +7,6 @@ use mongodb::{
 use serde_json::Value;
 use serde::{Serialize, Deserialize};
 
-
-
-
 #[derive(Serialize, Deserialize)]
 pub struct OperationResult {
     status: String,
