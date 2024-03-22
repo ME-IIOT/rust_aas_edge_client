@@ -1,4 +1,5 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{
+    web, HttpResponse, Responder};
 use mongodb::{
     bson::{doc, oid::ObjectId, Document},
     Database,
@@ -36,9 +37,14 @@ use crate::lib::database::{aas_find_one, aas_update_one};
 //     }
 // }
 
+
+// GUIDE -> db: web::Data<Database> from the shared data
+//#[get("/database/{id}")]
 pub async fn get_database(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
+    // GUIDE: For multiple: let (user_id, book_id) = path.into_inner(); // Destructure the tuple to get both parameters
     let _id = path.into_inner(); // Here, _id is directly used as a string
-    let collection_name = "books";
+    println!("ID: {}", _id);
+    let collection_name = "submodels";
     let collection = db.collection::<Document>(collection_name);
 
     // let filter = doc! { "_id": &_id }; // Use _id as a string directly in the filter
@@ -69,6 +75,7 @@ pub async fn get_database(db: web::Data<Database>, path: web::Path<String>) -> i
 }
 
 // For multiple: let (user_id, book_id) = path.into_inner(); // Destructure the tuple to get both parameters
+//#[post("/database/{id}")]
 pub async fn add_database(db: web::Data<Database>, json: web::Json<Value>, path: web::Path<String,>) -> impl Responder {
     let collection_name = "books";
     let collection = db.collection::<Document>(collection_name);
@@ -99,6 +106,7 @@ pub async fn add_database(db: web::Data<Database>, json: web::Json<Value>, path:
     }
 }
 
+//#[put("/database/{id}")]
 pub async fn update_database(db: web::Data<Database>, json: web::Json<Value>, path: web::Path<String,>) -> impl Responder {
     let collection_name = "books";
     let collection = db.collection::<Document>(collection_name);
