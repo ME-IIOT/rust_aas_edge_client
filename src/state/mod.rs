@@ -7,4 +7,5 @@ pub struct AppState {
     pub aas_identifier: String,
     pub aas_id_short: String,
     pub aasx_server: String,
+    pub device_name: String,
 }

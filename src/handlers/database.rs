@@ -8,7 +8,7 @@ use mongodb::bson;
 use serde_json::{json, Value};
 use futures_util::stream::TryStreamExt;
 
-use crate::lib::database::{aas_find_one, aas_update_one};
+use crate::lib::aas_interfaces::{aas_find_one, aas_update_one};
 
 // GUIDE -> db: web::Data<Database> from the shared data
 // pub async fn get_database(db: web::Data<Database>, path: web::Path<(String,)>) -> impl Responder {
