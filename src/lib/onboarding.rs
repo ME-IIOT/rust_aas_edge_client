@@ -1,180 +1,282 @@
-// use crate::database::{aas_find_one, aas_update_one};
-
-// use actix_web::{web, App, HttpServer};
-// use mongodb::{self, bson::{doc, Document}, Collection};
 use mongodb;
 use reqwest;
-// use serde_json::Value;
 use serde_json;
-// use std::collections::HashMap;
-// use futures::stream::{FuturesUnordered, StreamExt};
-// use std::sync::Arc;
 use base64;
-// use std::error::Error;
 use std;
-use anyhow::{Context, Result};
+use anyhow;
+use anyhow::Context;
+use tokio;
+use futures;
 
-pub async fn fetch_single_submodel(
-    submodel_uid: &str,
-    submodels_collection: mongodb::Collection<mongodb::bson::Document>,
+// TODO: Missing shell collection
+async fn fetch_single_submodel(
     aasx_server_url: &str,
     aas_id_short: &str,
-    // submodels_dictionary: mongodb::bson::Document,
     aas_uid: &str,
-) -> Result<()> {
+    submodel_uid: &str,
+    submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+    submodels_dictionary: std::sync::Arc<tokio::sync::Mutex<mongodb::bson::Document>>,
+) -> std::result::Result<(), actix_web::Error> {
     let submodel_url = format!(
         "{}/shells/{}/submodels/{}",
         aasx_server_url,
-        base64::encode_config(aas_uid, base64::URL_SAFE),
-        base64::encode_config(submodel_uid, base64::URL_SAFE)
+        base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
+        base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD)
     );
 
-    let response = reqwest::get(&submodel_url)
+    let client = reqwest::Client::new();
+    let response = client.get(&submodel_url)
+        .send()
         .await
-        .context("Failed to send request to fetch submodel")?;
+        .with_context(|| format!("Failed to send request to fetch submodel from URL: {}", submodel_url))
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
     if response.status().is_success() {
-        let body: serde_json::Value = response
-            .json()
-            .await
-            .context("Failed to parse response body as JSON")?;
-        let submodel_id_short = body["idShort"]
-            .as_str()
-            .context("Failed to extract idShort from response body")?;
+        let body: serde_json::Value = response.json().await
+            .with_context(|| "Failed to parse response body as JSON")
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+        let submodel_id_short = body["idShort"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Failed to extract idShort from response body"))
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
         let bson_value = mongodb::bson::to_bson(&body)
-            .context("Failed to convert JSON body to BSON")?;
+            .with_context(|| "Failed to convert JSON body to BSON")
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
         if let mongodb::bson::Bson::Document(document) = bson_value {
-            submodels_collection
-                .update_one(
-                    mongodb::bson::doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
-                    mongodb::bson::doc! { "$set": document },
-                    mongodb::options::UpdateOptions::builder().upsert(true).build(),
-                )
-                .await
-                .context("Failed to update submodel in the database")?;
+            let collection_lock = submodels_collection.lock().await;
+            collection_lock.update_one(
+                mongodb::bson::doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
+                mongodb::bson::doc! { "$set": document },
+                mongodb::options::UpdateOptions::builder().upsert(true).build(),
+            ).await
+            .with_context(|| "Failed to update submodel in the database")
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+            println!("Successfully fetched submodel: {}", submodel_id_short)
         } else {
-            return Err(anyhow::anyhow!("Conversion to Document failed."));
+            return Err(actix_web::error::ErrorInternalServerError("Conversion to Document failed."));
         }
+
+        let mut dictionary_lock = submodels_dictionary.lock().await;
+        dictionary_lock.insert(submodel_id_short.to_string(), mongodb::bson::Bson::String(submodel_uid.to_string()));
     } else {
-        return Err(anyhow::anyhow!(
-            "Failed to fetch URL {}. Status code: {:?}",
+        // Clone the status code before consuming the response with `.text().await`
+        let status_code = response.status().clone();
+
+        let response_body = match response.text().await {
+            Ok(text) => text,
+            Err(_) => String::new(), // In case of error, default to an empty string
+        };
+        
+        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_url, status_code, response_body);
+        return Err(actix_web::error::ErrorInternalServerError(format!(
+            "Failed to fetch URL {}. Status code: {}. Response body: {}",
             submodel_url,
-            response.status()
-        ));
+            status_code,
+            response_body
+        )));
     }
 
     Ok(())
 }
-// async fn fetch_single_submodel(
-//     submodel_uid: &str,
-//     submodels_collection: Collection<Value>,
-//     aasx_server_url: &str,
-//     aas_id_short: &str,
-//     submodels_dictionary: Document,
-//     aas_uid: &str,
-// ) {
-//     let submodel_url = format!("{}/shells/{}/submodels/{}", aasx_server_url, encode_config(aas_uid, base64::URL_SAFE), encode_config(submodel_uid, base64::URL_SAFE));
-//     let response = reqwest::get(&submodel_url).await;
 
-//     match response {
-//         Ok(resp) => {
-//             if resp.status().is_success() {
-//                 let body: Value = resp.json().await.unwrap();
-//                 let submodel_id_short = body["idShort"].as_str().unwrap();
-//                 submodels_collection.update_one(
-//                     doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
-//                     doc! { "$set": body },
-//                     mongodb::options::UpdateOptions::builder().upsert(true).build(),
-//                 ).await.unwrap();
 
-//                 let mut dictionary = submodels_dictionary.lock().unwrap();
-//                 dictionary[submodel_id_short] = json!(submodel_uid);
-//             } else {
-//                 println!("Failed to fetch URL {}. Status code: {:?}", submodel_url, resp.status());
+async fn fetch_all_submodels(
+    aasx_server_url: &str,
+    aas_id_short: &str,
+    submodel_uids: Vec<String>,
+    submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+    aas_uid: &str,
+) -> Result<(), actix_web::Error> {
+    println!("Fetching submodels from {}", aas_id_short);
+    let submodels_dictionary = std::sync::Arc::new(tokio::sync::Mutex::new(mongodb::bson::Document::new()));
+
+    let fetch_tasks: Vec<_> = submodel_uids.into_iter().map(|submodel_uid| {
+        let submodels_collection_cloned = std::sync::Arc::clone(&submodels_collection);
+        let submodels_dictionary_cloned = std::sync::Arc::clone(&submodels_dictionary);
+        let aasx_server_url_cloned = aasx_server_url.to_string();
+        let aas_id_short_cloned = aas_id_short.to_string();
+        let aas_uid_cloned = aas_uid.to_string();
+
+        tokio::spawn(async move {
+            match fetch_single_submodel(
+                &aasx_server_url_cloned,
+                &aas_id_short_cloned,
+                &aas_uid_cloned,
+                &submodel_uid,
+                submodels_collection_cloned,
+                submodels_dictionary_cloned,
+            ).await {
+                Ok(_) => {},
+                Err(e) => {
+                    // Handle error appropriately, ensuring it doesn't require passing non-Send types across threads
+                }
+            }
+        })
+    }).collect();
+
+    let _results = futures::future::join_all(fetch_tasks).await;
+
+    let dictionary_lock = submodels_dictionary.lock().await;
+    let bson_dictionary = mongodb::bson::to_bson(&*dictionary_lock)
+                                        .with_context(|| "Failed to convert submodels dictionary to BSON")
+                                        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    if let mongodb::bson::Bson::Document(document) = bson_dictionary {
+        let collection_lock = submodels_collection.lock().await;
+        collection_lock.update_one(
+            mongodb::bson::doc! { "_id": format!("{}:submodels_dictionary", aas_id_short) },
+            mongodb::bson::doc! { "$set": document  },
+            mongodb::options::UpdateOptions::builder().upsert(true).build(),
+        ).await
+        .with_context(|| "Failed to update submodels dictionary in the database")
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    }
+    Ok(())
+}
+
+pub async fn edge_device_onboarding(
+    aasx_server: &str,
+    aas_uid: &str,
+    aas_id_short: &str,
+    shells_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+    submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+) -> Result<(), actix_web::Error> {
+    let url: String = format!(
+        "{}/shells/{}",
+        aasx_server,
+        base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD)
+    );
+
+    println!("Fetching URL: {}", url);
+
+    let client: reqwest::Client = reqwest::Client::new();
+    let response: reqwest::Response = client.get(&url).send().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    if response.status().is_success() {
+        let insert_data: mongodb::bson::Document = response.json().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+        // Assuming the logic to extract submodels ID is defined somewhere
+        let submodels_id: Vec<String> = extract_submodels_id(&insert_data)?;
+
+        {
+            let collection_lock: tokio::sync::MutexGuard<'_, mongodb::Collection<mongodb::bson::Document>> = shells_collection.lock().await;
+            collection_lock.update_one(
+                mongodb::bson::doc! { "_id": aas_id_short },
+                mongodb::bson::doc! { "$set": insert_data },
+                mongodb::options::UpdateOptions::builder().upsert(true).build(),
+            ).await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        }
+
+        fetch_all_submodels(
+            aasx_server,
+            aas_id_short,
+            submodels_id,
+            submodels_collection,
+            aas_uid,
+        ).await?;
+    } else {
+        println!("Failed to fetch URL. Status code: {}", response.status());
+        return Err(actix_web::error::ErrorInternalServerError(format!(
+            "Failed to fetch URL. Status code: {}",
+            response.status()
+        )));
+    }
+
+    Ok(())
+}
+
+// fn extract_submodels_id(data: &serde_json::Value) -> Result<Vec<String>, actix_web::Error> {
+//     let mut filtered_values = Vec::new();
+
+//     // Access "submodels" field, defaulting to an empty array if not found
+//     let submodels = data.get("submodels").and_then(|v| v.as_array()).unwrap_or(&vec![]);
+
+//     for submodel in submodels {
+//         // Check if the submodel's type is "ModelReference"
+//         if submodel.get("type").and_then(|t| t.as_str()) == Some("ModelReference") {
+//             // Extract the value from the first element in "keys", if any
+//             let value = submodel.get("keys")
+//                 .and_then(|k| k.as_array())
+//                 .and_then(|arr| arr.get(0))
+//                 .and_then(|k| k.get("value"))
+//                 .and_then(|v| v.as_str());
+
+//             if let Some(value_str) = value {
+//                 filtered_values.push(value_str.to_string());
 //             }
-//         },
-//         Err(e) => println!("Failed to send request: {}", e),
+//         }
 //     }
+//     Ok(filtered_values)
 // }
 
-// async fn onboarding_submodels(
-//     aasx_server_url: String,
-//     aas_id_short: String,
-//     submodels_id: Vec<String>,
-//     submodels_collection: Collection<Value>,
-//     aas_uid: String,
-// ) {
-//     let submodels_dictionary = Arc::new(std::sync::Mutex::new(json!({})));
+fn extract_submodels_id(data: &mongodb::bson::Document) -> Result<Vec<String>, actix_web::Error> {
+    let mut filtered_values = Vec::new();
 
-//     let futures: FuturesUnordered<_> = submodels_id.into_iter().map(|submodel_id| {
-//         let submodels_collection = submodels_collection.clone();
-//         let submodels_dictionary = Arc::clone(&submodels_dictionary);
-//         fetch_single_submodel(&submodel_id, submodels_collection, &aasx_server_url, &aas_id_short, submodels_dictionary, &aas_uid)
-//     }).collect();
+    // Try to access "submodels" field as an array. If not present or not an array, default to empty.
+    let submodels = match data.get_array("submodels") {
+        Ok(submodels) => submodels,
+        Err(_) => return Ok(filtered_values), // If there's an issue, return the empty vector.
+    };
 
-//     futures.collect::<Vec<()>>().await;
+    for submodel in submodels.iter() {
+        // Cast each submodel as a Document to access its fields.
+        if let mongodb::bson::Bson::Document(submodel_doc) = submodel {
+            // Check if the submodel's type is "ModelReference"
+            if submodel_doc.get_str("type").unwrap_or_default() == "ModelReference" {
+                // Try to extract the value from the first element in "keys"
+                if let Ok(keys) = submodel_doc.get_array("keys") {
+                    if let Some(mongodb::bson::Bson::Document(first_key_doc)) = keys.first() {
+                        if let Ok(value_str) = first_key_doc.get_str("value") {
+                            filtered_values.push(value_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-//     let submodels_dictionary = Arc::try_unwrap(submodels_dictionary).unwrap().into_inner().unwrap();
-//     submodels_collection.update_one(
-//         doc! { "_id": format!("{}:submodels_dictionary", aas_id_short) },
-//         doc! { "$set": {"submodels": submodels_dictionary} },
-//         mongodb::options::UpdateOptions::builder().upsert(true).build(),
-//     ).await.unwrap();
-// }
+    Ok(filtered_values)
+}
 
-// pub async fn edge_device_onboarding(
-//     aasx_server: String,
-//     aas_uid: String,
-//     aas_id_short: String,
-//     shells_collection: Collection<Value>,
-//     submodels_collection: Collection<Value>,
-// ) {
-//     let url = format!("{}/shells/{}", aasx_server, encode_config(&aas_uid, base64::URL_SAFE));
-//     let response = reqwest::get(&url).await;
+// fn extract_submodels_id(data: &mongodb::bson::Document) -> Result<Vec<String>, actix_web::Error> {
+//     let mut filtered_values = Vec::new();
 
-//     match response {
-//         Ok(resp) => {
-//             if resp.status().is_success() {
-//                 let insert_data: Value = resp.json().await.unwrap();
-//                 shells_collection.update_one(
-//                     doc! { "_id": &aas_id_short },
-//                     doc! { "$set": insert_data },
-//                     mongodb::options::UpdateOptions::builder().upsert(true).build(),
-//                 ).await.unwrap();
+//     // Access "submodels" field, defaulting to an empty array if not found
+//     let submodels = data.get_array("submodels").unwrap_or(&vec![]);
 
-//                 let submodels_id: Vec<String> = extract_submodels_id(&insert_data); // Assume this function is implemented and returns Vec<String>
-//                 onboarding_submodels(aasx_server, aas_id_short, submodels_id, submodels_collection, aas_uid).await;
-//             } else {
-//                 println!("Failed to fetch URL. Status code: {:?}", resp.status());
-//             }
-//         },
-//         Err(e) => println!("Failed to send request: {}", e),
-//     }
-// }
-
-// fn extract_submodels_id(data: &Value) -> Vec<String> {
-//     let mut filtered_values: Vec<String> = Vec::new();
-
-//     // Check if "submodels" key exists and is an array
-//     if let Some(submodels) = data.get("submodels").and_then(|v| v.as_array()) {
-//         // Iterate through the submodels
-//         for submodel in submodels {
-//             // Check if the submodel type is "ModelReference"
-//             if submodel.get("type").and_then(|v| v.as_str()) == Some("ModelReference") {
-//                 // Attempt to get the first item of "keys" array and its "value" key
-//                 let value = submodel.get("keys")
-//                     .and_then(|v| v.as_array())
-//                     .and_then(|arr| arr.get(0))
-//                     .and_then(|item| item.get("value"))
-//                     .and_then(|v| v.as_str());
-
-//                 if let Some(value_str) = value {
-//                     filtered_values.push(value_str.to_string());
+//     for submodel in submodels {
+//         // Attempt to cast each submodel as a Document to access its fields
+//         if let Some(submodel_doc) = submodel.as_document() {
+//             // Check if the submodel's type is "ModelReference"
+//             if submodel_doc.get_str("type").unwrap_or_default() == "ModelReference" {
+//                 // Extract the value from the first element in "keys", if any
+//                 if let Ok(keys) = submodel_doc.get_array("keys") {
+//                     if let Some(first_key) = keys.first() {
+//                         if let Some(mongodb::bson::Bson::Document(key_doc)) = first_key.as_document() {
+//                             if let Ok(value_str) = key_doc.get_str("value") {
+//                                 filtered_values.push(value_str.to_string());
+//                             }
+//                         }
+//                     }
 //                 }
 //             }
 //         }
 //     }
 
-//     filtered_values
+//     Ok(filtered_values)
 // }
+
+fn convert_json_to_document(value: &serde_json::Value) -> Result<mongodb::bson::Document, actix_web::Error> {
+    // First, convert serde_json::Value to mongodb::bson::Bson
+    let bson_value = mongodb::bson::to_bson(value)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error converting JSON to BSON: {}", e)))?;
+
+    // Then, try to convert mongodb::bson::Bson to mongodb::bson::Document
+    let document = mongodb::bson::from_bson::<mongodb::bson::Document>(bson_value)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error converting BSON to Document: {}", e)))?;
+
+    Ok(document)
+}

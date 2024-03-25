@@ -18,3 +18,4 @@ dotenv = "0.15.0" # to load env var
 reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.13"
 anyhow = "1.0"
+futures = "0.3"

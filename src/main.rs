@@ -4,6 +4,58 @@ use mongodb::{Client, options::ClientOptions, Collection};
 use std::{convert::TryFrom, error::Error};
 use std::env;
 use serde_json::Value;
+use anyhow::Context;
+
+
+// async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson::Document>, mongodb::Collection<mongodb::bson::Document>) {
+//     let database_url = std::env::var("MONGO_URI").expect("MONGO_URI must be set");
+
+//     // Parse the MongoDB connection string into client options, panicking on failure.
+//     let client_options = mongodb::options::ClientOptions::parse(&database_url).await
+//         .expect("Failed to parse MongoDB URI into client options");
+
+//     // Attempt to create a MongoDB client with the specified options, panicking on failure.
+//     let client = mongodb::Client::with_options(client_options)
+//         .expect("Failed to initialize MongoDB client with given options");
+
+//     // Access the specific database.
+//     let db = client.database("aas_edge_database");
+
+//     // Access the specific collections.
+//     let shells_collection = db.collection::<mongodb::bson::Document>("shells");
+//     let submodels_collection = db.collection::<mongodb::bson::Document>("submodels");
+
+//     // Return the database and collections; no error handling required here as any failure would have already caused a panic.
+//     (db, shells_collection, submodels_collection)
+// }
+async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson::Document>, mongodb::Collection<mongodb::bson::Document>) {
+    let database_url = std::env::var("MONGO_URI").expect("MONGO_URI must be set");
+
+    // Parse the MongoDB connection string into client options, panicking on failure.
+    let client_options = mongodb::options::ClientOptions::parse(&database_url).await
+        .expect("Failed to parse MongoDB URI into client options");
+
+    // Attempt to create a MongoDB client with the specified options, panicking on failure.
+    let client = mongodb::Client::with_options(client_options)
+        .expect("Failed to initialize MongoDB client with given options");
+
+    // Perform a simple operation to ensure the MongoDB server is accessible.
+    // This operation tries to list database names, forcing a connection to be established.
+    // Panics if the MongoDB server is not accessible.
+    client.list_database_names(None, None).await
+        .expect("Failed to connect to MongoDB. Ensure MongoDB is running and accessible.");
+
+    // Access the specific database.
+    let db = client.database("aas_edge_database");
+
+    // Access the specific collections.
+    let shells_collection = db.collection::<mongodb::bson::Document>("shells");
+    let submodels_collection = db.collection::<mongodb::bson::Document>("submodels");
+
+    // Return the database and collections; if any of the above steps fail, the function will have already panicked.
+    (db, shells_collection, submodels_collection)
+}
+
 
 // Load environment variables from aas_client.env file
 async fn load_env() {
@@ -25,49 +77,61 @@ async fn main() -> std::io::Result<()> {
     // Load environment variables from .env file
     load_env().await;
     
-    
-
-
     // GUIDE: set env var for logging
     std::env::set_var("RUST_LOG", "actix_web=info");
     std::env::set_var("RUST_BACKTRACE", "1");
     // GUIDE: add logger
     env_logger::init();
 
-    // GUIDE: mongodb connection
-    let database_url: String = env::var("MONGO_URI").expect("MONGO_URI must be set");
-    let client = Client::with_uri_str(database_url).await.unwrap();
-    // let client_data = web::Data::new(client.clone());
-    let db = client.database("aas_edge_database"); // Assuming the database name is 'aas_edge_database'
-    let shells_collection: mongodb::Collection<mongodb::bson::Document> = db.collection("shells");
-    let submodels_collection: mongodb::Collection<mongodb::bson::Document> = db.collection("submodels");
+    let (db, shells_collection, submodels_collection) = init_mongodb().await;
+        
 
-    let mongo_uri = env::var("MONGO_URI").unwrap_or(String::from("MONGO_URI=mongodb://mongodb:27017/mydatabase"));
-    let aas_id_short  = env::var("AAS_IDSHORT ").unwrap_or(String::from("Murrelektronik_V000_CTXQ0_0100001_AAS"));
-    let aas_identifier  = env::var("AAS_IDENTIFIER ").unwrap_or(String::from("https://aas.murrelektronik.com/V000-CTXQ0-0100001/aas/1/0"));
-    let aasx_server = env::var("AASX_SERVER").unwrap_or(String::from("https://ca-aasxserverv3-dev-001.yellowtree-6659c4fd.northeurope.azurecontainerapps.io/"));
-
-    lib::onboarding::fetch_single_submodel(
-        &"aHR0cHM6Ly9leGFtcGxlLmNvbS9pZHMvc20vOTM5MF80MTYwXzAxMzJfMDk0MA",
-        submodels_collection,
-        &aasx_server.to_string(),
-        &aas_id_short.to_string(),
-        // shells_collection,
-        &aas_identifier.to_string(),
-    ).await;
+    // Fetch the environment variables
+    let mongo_uri = env::var("MONGO_URI").expect("MONGO_URI must be set");
+    let aas_id_short = env::var("AAS_IDSHORT").expect("AAS_IDSHORT must be set");
+    let aas_identifier = env::var("AAS_IDENTIFIER").expect("AAS_IDENTIFIER must be set");
+    let aasx_server = env::var("AASX_SERVER").expect("AASX_SERVER must be set");
 
     // let db = client.database("bookshelf");
-    let shared_data = web::Data::new(state::AppState {
-        // Example shared state
-        health_check_response: Mutex::new(String::from("I'm OK!")),
+    // Initialize AppState with all necessary data
+    let app_state = web::Data::new(state::AppState {
+        health_check_response: std::sync::Mutex::new(String::from("I'm OK!")),
+        mongo_uri,
+        aas_identifier,
+        aas_id_short,
+        aasx_server,
     });
+
+    // if let Err(e) = lib::onboarding::fetch_single_submodel(
+    //     &"https://aas.murrelektronik.com/v000-ctxq0-0100001/sm/1/0/de02143657/nameplate", // This would be a specific submodel UID you're interested in fetching
+    //     submodels_collection.clone(),
+    //     &app_state.aasx_server,
+    //     &app_state.aas_id_short,
+    //     // shells_collection,
+    //     &app_state.aas_identifier,
+    // ).await {
+    //     eprintln!("Failed to fetch single submodel: {}", e);
+    // }
+
+    let submodels_collection_arc = std::sync::Arc::new(tokio::sync::Mutex::new(submodels_collection));
+    let shells_collection_arc = std::sync::Arc::new(tokio::sync::Mutex::new(shells_collection));
+    
+    if let Err(e) = lib::onboarding::edge_device_onboarding(
+        &app_state.aasx_server,
+        &app_state.aas_identifier,
+        &app_state.aas_id_short,
+        shells_collection_arc.clone(),
+        submodels_collection_arc.clone(),
+    ).await {
+        eprintln!("Failed to onboard submodels: {}", e);
+    }
 
     HttpServer::new(move || {
         App::new()
             // GUIDE: add logger middleware
             .wrap(Logger::default())
             // GUIDE: pass shared data to the app
-            .app_data(shared_data.clone())
+            .app_data(app_state.clone())
             .app_data(web::Data::new(db.clone()))
             // GUIDE: Configure the routes
             .configure(routes::config) 
