@@ -1,13 +1,12 @@
-use std::clone;
-
+// use std::clone;
 use actix_web::{web, HttpResponse, Responder};
 use mongodb::{
     bson::{self, doc, Bson, Document},
     Collection, Database,
     options::UpdateOptions,
 };
-use serde_json::Value;
-use serde::{Serialize, Deserialize};
+// use serde_json::Value;
+// use serde::{Serialize, Deserialize};
 
 // Adjusted to return a Result<Value, String> to better handle success and error states.
 pub async fn aas_find_one(
@@ -97,4 +96,46 @@ pub fn aas_sm_2_client_json(submodel_elements: Vec<mongodb::bson::Document>) -> 
     }
 
     client_json
+}
+
+pub async fn get_submodel(
+    submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+    aas_id_short: &str,
+    submodel_id_short: &str
+) -> Result<mongodb::bson::Document, String> {
+    let submodels_collection_lock = submodels_collection_arc.lock().await;
+    
+    let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
+
+    let aas_submodel_result = aas_find_one(_id_submodel, submodels_collection_lock.clone()).await;
+    let aas_submodel = match aas_submodel_result {
+        Ok(aas_submodel) => aas_submodel,
+        Err(e) => return Err(format!("Error getting submodel: {}", e)),
+    };
+
+    let submodel_elements = match aas_submodel.get_array("submodelElements"){
+        Ok(submodel_elements) => submodel_elements,
+        Err(e) => return Err(format!("Error getting submodel elements: {}", e)),
+    };
+    let submodel_template: Vec<Document> = submodel_elements.iter().filter_map(|bson_item| {
+        if let Bson::Document(doc) = bson_item {
+            Some(doc.clone())
+        } else {
+            None // Handle non-Document items appropriately
+        }
+    }).collect();
+    
+    let client_bson = aas_sm_2_client_json(submodel_template);
+    Ok(client_bson)
+// ) -> Result<> {
+    // let submodels_collection_lock = submodels_collection_arc.lock();
+    // let id_submodel = format!("{}.{}", aas_id_short, submodel_id_short);
+
+    // let aas_submodel_result = aas_find_one(id_submodel, submodels_collection_lock.clone());
+    // let aas_submodel = match aas_submodel_result {
+    //     Ok(aas_submodel) => aas_submodel,
+    //     Err(e) => return Err(format!("Error getting submodel: {}", e)),
+    // };
+    // // let client_bson = aas_sm_2_client_json(aas_submodel);
+    // // Ok(client_bson)
 }

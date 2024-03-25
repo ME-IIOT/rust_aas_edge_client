@@ -54,7 +54,7 @@ async fn fetch_single_submodel(
             .with_context(|| "Failed to update submodel in the database")
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-            println!("Successfully fetched submodel: {}", submodel_id_short)
+            // println!("Successfully fetched submodel: {}", submodel_id_short)
         } else {
             return Err(actix_web::error::ErrorInternalServerError("Conversion to Document failed."));
         }
@@ -269,14 +269,14 @@ fn extract_submodels_id(data: &mongodb::bson::Document) -> Result<Vec<String>, a
 //     Ok(filtered_values)
 // }
 
-fn convert_json_to_document(value: &serde_json::Value) -> Result<mongodb::bson::Document, actix_web::Error> {
-    // First, convert serde_json::Value to mongodb::bson::Bson
-    let bson_value = mongodb::bson::to_bson(value)
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error converting JSON to BSON: {}", e)))?;
+// fn convert_json_to_document(value: &serde_json::Value) -> Result<mongodb::bson::Document, actix_web::Error> {
+//     // First, convert serde_json::Value to mongodb::bson::Bson
+//     let bson_value = mongodb::bson::to_bson(value)
+//         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error converting JSON to BSON: {}", e)))?;
 
-    // Then, try to convert mongodb::bson::Bson to mongodb::bson::Document
-    let document = mongodb::bson::from_bson::<mongodb::bson::Document>(bson_value)
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error converting BSON to Document: {}", e)))?;
+//     // Then, try to convert mongodb::bson::Bson to mongodb::bson::Document
+//     let document = mongodb::bson::from_bson::<mongodb::bson::Document>(bson_value)
+//         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error converting BSON to Document: {}", e)))?;
 
-    Ok(document)
-}
+//     Ok(document)
+// }
