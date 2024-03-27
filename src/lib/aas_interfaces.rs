@@ -1,8 +1,8 @@
 // use std::clone;
 use actix_web::{web, HttpResponse, Responder};
 use mongodb::{
-    bson::{self, doc, Bson, Document},
-    Collection, Database,
+    bson::{ doc, Bson, Document},
+    Collection,
     options::UpdateOptions,
 };
 // use serde_json::Value;
@@ -127,15 +127,5 @@ pub async fn get_submodel(
     
     let client_bson = aas_sm_2_client_json(submodel_template);
     Ok(client_bson)
-// ) -> Result<> {
-    // let submodels_collection_lock = submodels_collection_arc.lock();
-    // let id_submodel = format!("{}.{}", aas_id_short, submodel_id_short);
-
-    // let aas_submodel_result = aas_find_one(id_submodel, submodels_collection_lock.clone());
-    // let aas_submodel = match aas_submodel_result {
-    //     Ok(aas_submodel) => aas_submodel,
-    //     Err(e) => return Err(format!("Error getting submodel: {}", e)),
-    // };
-    // // let client_bson = aas_sm_2_client_json(aas_submodel);
-    // // Ok(client_bson)
 }
+
