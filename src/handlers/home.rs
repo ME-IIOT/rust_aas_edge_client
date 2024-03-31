@@ -64,7 +64,7 @@ pub async fn index(
     for (key, _) in submodels_dictionary.iter() {
         let link_object = mongodb::bson::doc! {
             "href": key,
-            "rel": format!("submodels/{}", key),
+            "rel": format!("/submodels/{}", key),
             "method": "GET"
         };
         bson_data.get_array_mut("links").unwrap().push(Bson::Document(link_object));

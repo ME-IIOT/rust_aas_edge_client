@@ -17,66 +17,115 @@ async fn fetch_single_submodel(
     submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
     submodels_dictionary: std::sync::Arc<tokio::sync::Mutex<mongodb::bson::Document>>,
 ) -> std::result::Result<(), actix_web::Error> {
-    let submodel_url = format!(
-        "{}/shells/{}/submodels/{}",
+    let submodel_url_id_short = format!(
+        "{}shells/{}/submodels/{}",
+        aasx_server_url,
+        base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
+        base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD)
+    );
+
+    let submodel_url_value = format!(
+        "{}shells/{}/submodels/{}/$value",
         aasx_server_url,
         base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
         base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD)
     );
 
     let client = reqwest::Client::new();
-    let response = client.get(&submodel_url)
+    let response_id_short = client.get(&submodel_url_id_short)
         .send()
         .await
-        .with_context(|| format!("Failed to send request to fetch submodel from URL: {}", submodel_url))
+        .with_context(|| format!("Failed to send request to fetch submodel id short from URL: {}", submodel_url_id_short))
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-    if response.status().is_success() {
-        let body: serde_json::Value = response.json().await
+    let response_value = client.get(&submodel_url_value)
+        .send()
+        .await
+        .with_context(|| format!("Failed to send request to fetch submodel value from URL: {}", submodel_url_value))
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    if response_id_short.status().is_success() & response_value.status().is_success(){
+        let body_id_short: serde_json::Value = response_id_short.json().await
             .with_context(|| "Failed to parse response body as JSON")
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-        let submodel_id_short = body["idShort"].as_str()
+        let body_value: serde_json::Value = response_value.json().await
+            .with_context(|| "Failed to parse response body as JSON")
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+        let submodel_id_short = body_id_short["idShort"].as_str()
             .ok_or_else(|| anyhow::anyhow!("Failed to extract idShort from response body"))
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-        let bson_value = mongodb::bson::to_bson(&body)
+        // bson value collect from $value
+        let bson_value = mongodb::bson::to_bson(&body_value)
             .with_context(|| "Failed to convert JSON body to BSON")
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
+        // if let mongodb::bson::Bson::Document(document) = bson_value {
+        //     let collection_lock = submodels_collection.lock().await;
+        //     collection_lock.update_one(
+        //         mongodb::bson::doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
+        //         mongodb::bson::doc! { "$set": document },
+        //         mongodb::options::UpdateOptions::builder().upsert(false).build(),
+        //     ).await
+        //     .with_context(|| "Failed to update submodel in the database")
+        //     .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+        //     println!("Successfully fetched submodel: {}", submodel_id_short)
+        // } else {
+        //     return Err(actix_web::error::ErrorInternalServerError("Conversion to Document failed."));
+        // }
         if let mongodb::bson::Bson::Document(document) = bson_value {
             let collection_lock = submodels_collection.lock().await;
-            collection_lock.update_one(
+            collection_lock.replace_one(
                 mongodb::bson::doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
-                mongodb::bson::doc! { "$set": document },
-                mongodb::options::UpdateOptions::builder().upsert(true).build(),
+                document,
+                mongodb::options::ReplaceOptions::builder().upsert(false).build(),
             ).await
-            .with_context(|| "Failed to update submodel in the database")
+            .with_context(|| "Failed to replace submodel in the database")
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-
-            // println!("Successfully fetched submodel: {}", submodel_id_short)
+        
+            println!("Successfully replaced submodel: {}", submodel_id_short)
         } else {
             return Err(actix_web::error::ErrorInternalServerError("Conversion to Document failed."));
         }
 
         let mut dictionary_lock = submodels_dictionary.lock().await;
         dictionary_lock.insert(submodel_id_short.to_string(), mongodb::bson::Bson::String(submodel_uid.to_string()));
-    } else {
+    }
+    else if !response_id_short.status().is_success(){
         // Clone the status code before consuming the response with `.text().await`
-        let status_code = response.status().clone();
+        let status_code = response_id_short.status().clone();
 
-        let response_body = match response.text().await {
+        let response_body = match response_id_short.text().await {
             Ok(text) => text,
             Err(_) => String::new(), // In case of error, default to an empty string
         };
         
-        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_url, status_code, response_body);
+        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_url_id_short, status_code, response_body);
         return Err(actix_web::error::ErrorInternalServerError(format!(
             "Failed to fetch URL {}. Status code: {}. Response body: {}",
-            submodel_url,
+            submodel_url_id_short,
             status_code,
             response_body
         )));
+    } 
+    else {
+        let status_code = response_value.status().clone();
+
+        let response_body = match response_value.text().await {
+            Ok(text) => text,
+            Err(_) => String::new(), // In case of error, default to an empty string
+        };
+
+        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_url_value, status_code, response_body);
+        return Err(actix_web::error::ErrorInternalServerError(format!(
+            "Failed to fetch URL {}. Status code: {}. Response body: {}",
+            submodel_url_value,
+            status_code,
+            response_body
+        )));  
     }
 
     Ok(())
@@ -124,14 +173,24 @@ async fn fetch_all_submodels(
                                         .with_context(|| "Failed to convert submodels dictionary to BSON")
                                         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
+    // if let mongodb::bson::Bson::Document(document) = bson_dictionary {
+    //     let collection_lock = submodels_collection.lock().await;
+    //     collection_lock.update_one(
+    //         mongodb::bson::doc! { "_id": format!("{}:submodels_dictionary", aas_id_short) },
+    //         mongodb::bson::doc! { "$set": document  },
+    //         mongodb::options::UpdateOptions::builder().upsert(true).build(),
+    //     ).await
+    //     .with_context(|| "Failed to update submodels dictionary in the database")
+    //     .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    // }
     if let mongodb::bson::Bson::Document(document) = bson_dictionary {
         let collection_lock = submodels_collection.lock().await;
-        collection_lock.update_one(
+        collection_lock.replace_one(
             mongodb::bson::doc! { "_id": format!("{}:submodels_dictionary", aas_id_short) },
-            mongodb::bson::doc! { "$set": document  },
-            mongodb::options::UpdateOptions::builder().upsert(true).build(),
+            document,
+            mongodb::options::ReplaceOptions::builder().upsert(true).build(),
         ).await
-        .with_context(|| "Failed to update submodels dictionary in the database")
+        .with_context(|| "Failed to replace submodels dictionary in the database")
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     }
     Ok(())
@@ -163,12 +222,13 @@ pub async fn edge_device_onboarding(
 
         {
             let collection_lock: tokio::sync::MutexGuard<'_, mongodb::Collection<mongodb::bson::Document>> = shells_collection.lock().await;
-            collection_lock.update_one(
+            collection_lock.replace_one(
                 mongodb::bson::doc! { "_id": aas_id_short },
-                mongodb::bson::doc! { "$set": insert_data },
-                mongodb::options::UpdateOptions::builder().upsert(true).build(),
+                insert_data,
+                mongodb::options::ReplaceOptions::builder().upsert(true).build(),
             ).await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
         }
+        
 
         fetch_all_submodels(
             aasx_server,
