@@ -5,6 +5,7 @@ use std::{convert::TryFrom, error::Error};
 use std::env;
 use serde_json::Value;
 use anyhow::Context;
+use anyhow::{Result, anyhow};
 
 
 async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson::Document>, mongodb::Collection<mongodb::bson::Document>) {
@@ -42,6 +43,8 @@ async fn load_env() {
     }
 }
 
+
+
 // GUIDE: include the modules to main
 mod handlers;
 mod routes;
@@ -49,10 +52,20 @@ mod state;
 mod models;
 mod lib;
 
+use lib::scheduler_task;
+
 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    
+    // Run bash script
+    // let script_output = run_bash_script("./scripts/aas_client/sysInfo.sh").await;
+    // match script_output {
+    //     Ok(output) => println!("Script output: {}", output),
+    //     Err(e) => eprintln!("Script error: {}", e),
+    // }
+
     // Load environment variables from .env file
     load_env().await;
     
@@ -94,6 +107,8 @@ async fn main() -> std::io::Result<()> {
     ).await {
         eprintln!("Failed to onboard submodels: {}", e);
     }
+
+    scheduler_task::setup_scheduler().await;
 
     HttpServer::new(move || {
         App::new()
