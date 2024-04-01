@@ -6,6 +6,7 @@ use mongodb::{
     options::UpdateOptions,
 };
 use serde_json::Value;
+use reqwest;
 // use serde::{Serialize, Deserialize};
 
 // Adjusted to return a Result<Value, String> to better handle success and error states.
@@ -98,7 +99,7 @@ pub async fn aas_update_one(_id: String, collection: Collection<Document>, new_d
 //     client_json
 // }
 
-pub async fn get_submodel_collection(
+pub async fn get_submodel_database(
     submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
     aas_id_short: &str,
     submodel_id_short: &str
@@ -130,23 +131,24 @@ pub async fn get_submodel_collection(
     Ok(aas_submodel)
 }
 
-pub async fn patch_submodel_collection(
+pub async fn patch_submodel_database(
     submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
     aas_id_short: &str,
     submodel_id_short: &str,
-    json: web::Json<Value>
+    // json: &web::Json<Value> // Use reference since content of json is not changed
+    json: &Value
 ) -> Result<String, String> {
     let submodels_collection_lock = submodels_collection_arc.lock().await;
     
     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
 
     let aas_submodel_result = aas_find_one(_id_submodel.clone(), submodels_collection_lock.clone()).await;
-    let mut aas_submodel = match aas_submodel_result {
+    let aas_submodel = match aas_submodel_result {
         Ok(aas_submodel) => aas_submodel,
         Err(e) => return Err(format!("Error getting submodel: {}", e)),
     };
 
-    let mut patch_document: mongodb::bson::Document = match mongodb::bson::to_document(&json.0) {
+    let mut patch_document: mongodb::bson::Document = match mongodb::bson::to_document(&json) {
         Ok(document) => document,
         Err(e) => return Err(format!("Error parsing request body: {}", e)),
     };
@@ -183,5 +185,111 @@ fn merge_documents(old_doc: &Document, new_doc: &mut Document) {
                 new_doc.insert(key, old_value.clone());
             },
         }
+    }
+}
+
+// // send  data to server
+// pub async fn patch_submodel_server(
+//     submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+//     aas_id_short: &str,
+//     submodel_id_short: &str,
+//     aasx_server_url: &str,
+//     aas_uid: &str,
+//     json: web::Json<Value>
+// ) -> Result<String, String> {
+// {
+//     let submodels_collection_lock = submodels_collection_arc.lock().await;
+    
+//     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
+
+//     let aas_submodel_result = aas_find_one(_id_submodel.clone(), submodels_collection_lock.clone()).await;
+//     let mut aas_submodel = match aas_submodel_result {
+//         Ok(aas_submodel) => aas_submodel,
+//         Err(e) => return Err(format!("Error getting submodel: {}", e)),
+//     };
+
+//     let mut patch_document: mongodb::bson::Document = match mongodb::bson::to_document(&json.0) {
+//         Ok(document) => document,
+//         Err(e) => return Err(format!("Error parsing request body: {}", e)),
+//     };
+
+//     merge_documents(&aas_submodel, &mut patch_document);
+//     let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection_lock.clone()).await;
+//     let submodel_uid = match submodels_dictionary {
+//         Ok(submodels_dictionary) => {
+//             match submodels_dictionary.get(&submodel_id_short) {
+//                 Some(submodel_uid) => submodel_uid,
+//                 None => return Err("Submodel not found in dictionary".into()),
+//             }
+//         },
+//         Err(e) => return Err(format!("Error getting submodels dictionary: {}", e)),
+//     };
+
+//     let client = reqwest::Client::new();
+//     let url = format!(
+//         "{}shells/{}/submodels/{}/$value",
+//         aasx_server_url,
+//         base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
+//         base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD)
+//     )
+    
+//     let response = client.patch(&url)
+//         .json(&patch_document)
+//         .send()
+//         .await;
+
+//     if response.status().is_success() {
+//         Ok("Submodel patched successfully".into())
+//     } else {
+//         Err(format!("Error patching submodel: {:?}", response))
+//     }
+// }
+// }
+
+pub async fn patch_submodel_server(
+    submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<Collection<Document>>>,
+    aas_id_short: &str,
+    submodel_id_short: &str,
+    aasx_server_url: &str,
+    aas_uid: &str,
+    // json: &web::Json<Value>, // Use reference since content of json is not changed
+    json: &Value
+) -> Result<String, String> {
+    let submodels_collection_lock = submodels_collection_arc.lock().await;
+    let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
+
+    let submodels_collection = submodels_collection_lock.clone();
+    let aas_submodel = aas_find_one(_id_submodel, submodels_collection).await
+        .map_err(|e| format!("Error getting submodel: {}", e))?;
+
+    let mut patch_document: Document = mongodb::bson::to_document(&json)
+        .map_err(|e| format!("Error parsing request body: {}", e))?;
+
+    merge_documents(&aas_submodel, &mut patch_document);
+
+    let submodels_collection = submodels_collection_lock.clone();
+    let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection).await
+        .map_err(|e| format!("Error getting submodels dictionary: {}", e))?;
+
+    let submodel_uid = submodels_dictionary.get_str(submodel_id_short)
+        .map_err(|_| "Submodel not found in dictionary".to_string())?;
+
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}shells/{}/submodels/{}/$value",
+        aasx_server_url,
+        base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
+        base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD),
+    );
+
+    let response = client.patch(&url)
+        .json(&patch_document)
+        .send()
+        .await
+        .map_err(|e| format!("Error sending patch request: {}", e))?;
+
+    match response.status() {
+        reqwest::StatusCode::OK => Ok("Submodel patched successfully".into()),
+        _ => Err(response.text().await.unwrap_or_else(|_| "Unknown error".into())),
     }
 }
