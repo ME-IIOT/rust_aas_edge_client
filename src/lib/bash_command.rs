@@ -2,7 +2,7 @@ use tokio::process::Command;
 use anyhow::{Result, anyhow};
 
 /// Executes a bash script and returns its output as a String.
-async fn run_bash_script(script_path: &str) -> anyhow::Result<String> {
+pub async fn run_bash_script(script_path: &str) -> anyhow::Result<String> {
     let output = Command::new("bash")
         .arg(script_path)
         .output()

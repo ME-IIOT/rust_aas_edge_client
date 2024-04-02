@@ -16,15 +16,16 @@ async fn fetch_single_submodel(
     submodel_uid: &str,
     submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
     submodels_dictionary: std::sync::Arc<tokio::sync::Mutex<mongodb::bson::Document>>,
+    onboarding: bool,
 ) -> std::result::Result<(), actix_web::Error> {
-    let submodel_url_id_short = format!(
+    let submodel_id_short_url = format!(
         "{}shells/{}/submodels/{}",
         aasx_server_url,
         base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
         base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD)
     );
 
-    let submodel_url_value = format!(
+    let submodel_value_url = format!(
         "{}shells/{}/submodels/{}/$value",
         aasx_server_url,
         base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
@@ -32,16 +33,18 @@ async fn fetch_single_submodel(
     );
 
     let client = reqwest::Client::new();
-    let response_id_short = client.get(&submodel_url_id_short)
+    
+
+    let response_value = client.get(&submodel_value_url)
         .send()
         .await
-        .with_context(|| format!("Failed to send request to fetch submodel id short from URL: {}", submodel_url_id_short))
+        .with_context(|| format!("Failed to send request to fetch submodel value from URL: {}", submodel_value_url))
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-    let response_value = client.get(&submodel_url_value)
+    let response_id_short = client.get(&submodel_id_short_url)
         .send()
         .await
-        .with_context(|| format!("Failed to send request to fetch submodel value from URL: {}", submodel_url_value))
+        .with_context(|| format!("Failed to send request to fetch submodel id short from URL: {}", submodel_id_short_url))
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
     if response_id_short.status().is_success() & response_value.status().is_success(){
@@ -81,7 +84,7 @@ async fn fetch_single_submodel(
             collection_lock.replace_one(
                 mongodb::bson::doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
                 document,
-                mongodb::options::ReplaceOptions::builder().upsert(false).build(),
+                mongodb::options::ReplaceOptions::builder().upsert(true).build(),
             ).await
             .with_context(|| "Failed to replace submodel in the database")
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
@@ -103,10 +106,10 @@ async fn fetch_single_submodel(
             Err(_) => String::new(), // In case of error, default to an empty string
         };
         
-        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_url_id_short, status_code, response_body);
+        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_id_short_url, status_code, response_body);
         return Err(actix_web::error::ErrorInternalServerError(format!(
             "Failed to fetch URL {}. Status code: {}. Response body: {}",
-            submodel_url_id_short,
+            submodel_id_short_url,
             status_code,
             response_body
         )));
@@ -119,10 +122,10 @@ async fn fetch_single_submodel(
             Err(_) => String::new(), // In case of error, default to an empty string
         };
 
-        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_url_value, status_code, response_body);
+        println!("Failed to fetch URL {}. Status code: {}. Response body: {}", submodel_value_url, status_code, response_body);
         return Err(actix_web::error::ErrorInternalServerError(format!(
             "Failed to fetch URL {}. Status code: {}. Response body: {}",
-            submodel_url_value,
+            submodel_value_url,
             status_code,
             response_body
         )));  
@@ -138,8 +141,11 @@ async fn fetch_all_submodels(
     submodel_uids: Vec<String>,
     submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
     aas_uid: &str,
+    onboarding: bool,
 ) -> Result<(), actix_web::Error> {
-    println!("Fetching submodels from {}", aas_id_short);
+    
+    // println!("Fetching submodels from {}", aas_id_short);
+    println!("{:?}", submodel_uids);
     let submodels_dictionary = std::sync::Arc::new(tokio::sync::Mutex::new(mongodb::bson::Document::new()));
 
     let fetch_tasks: Vec<_> = submodel_uids.into_iter().map(|submodel_uid| {
@@ -157,6 +163,7 @@ async fn fetch_all_submodels(
                 &submodel_uid,
                 submodels_collection_cloned,
                 submodels_dictionary_cloned,
+                onboarding,
             ).await {
                 Ok(_) => {},
                 Err(e) => {
@@ -236,6 +243,7 @@ pub async fn edge_device_onboarding(
             submodels_id,
             submodels_collection,
             aas_uid,
+            true,
         ).await?;
     } else {
         println!("Failed to fetch URL. Status code: {}", response.status());
@@ -285,7 +293,7 @@ fn extract_submodels_id(data: &mongodb::bson::Document) -> Result<Vec<String>, a
         // Cast each submodel as a Document to access its fields.
         if let mongodb::bson::Bson::Document(submodel_doc) = submodel {
             // Check if the submodel's type is "ModelReference"
-            if submodel_doc.get_str("type").unwrap_or_default() == "ModelReference" {
+            // if submodel_doc.get_str("type").unwrap_or_default() == "ModelReference" {
                 // Try to extract the value from the first element in "keys"
                 if let Ok(keys) = submodel_doc.get_array("keys") {
                     if let Some(mongodb::bson::Bson::Document(first_key_doc)) = keys.first() {
@@ -294,7 +302,7 @@ fn extract_submodels_id(data: &mongodb::bson::Document) -> Result<Vec<String>, a
                         }
                     }
                 }
-            }
+            // }
         }
     }
 

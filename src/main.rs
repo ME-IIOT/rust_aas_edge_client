@@ -58,13 +58,6 @@ use lib::scheduler_task;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    
-    // Run bash script
-    // let script_output = run_bash_script("./scripts/aas_client/sysInfo.sh").await;
-    // match script_output {
-    //     Ok(output) => println!("Script output: {}", output),
-    //     Err(e) => eprintln!("Script error: {}", e),
-    // }
 
     // Load environment variables from .env file
     load_env().await;
@@ -108,7 +101,7 @@ async fn main() -> std::io::Result<()> {
         eprintln!("Failed to onboard submodels: {}", e);
     }
 
-    scheduler_task::setup_scheduler().await;
+    scheduler_task::submodels_scheduler(app_state.clone(), submodels_collection_arc.clone()).await;
 
     HttpServer::new(move || {
         App::new()
@@ -127,3 +120,10 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
+
+    // Run bash script
+    // let script_output = run_bash_script("./scripts/aas_client/sysInfo.sh").await;
+    // match script_output {
+    //     Ok(output) => println!("Script output: {}", output),
+    //     Err(e) => eprintln!("Script error: {}", e),
+    // }

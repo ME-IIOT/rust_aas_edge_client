@@ -53,7 +53,8 @@ pub async fn patch_submodel(
     //     Err(e) => return actix_web::HttpResponse::InternalServerError().body(format!("Error patching submodel: {}", e)),
     // };
 
-    match aas_interfaces::patch_submodel_database(submodels_collection, 
+    match aas_interfaces::patch_submodel_database(
+        submodels_collection, 
         &app_data.aas_id_short, 
         &submodel_id_short, 
         &json).await{

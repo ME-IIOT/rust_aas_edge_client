@@ -32,6 +32,7 @@ display_system_info() {
 
     # Output as JSON
     echo -e "{
+    \"HealthStatus\": \"NORMAL\",
     \"Hardware\": {
         \"Processor\": {
             \"CpuType\": \"$CPU_TYPE\",
@@ -48,8 +49,7 @@ display_system_info() {
         },
         \"BoardTemperature\": \"$BOARD_TEMPERATURE\"
     },
-    \"HealthStatus\": \"NORMAL\",
-    \"LastUpdate\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+    \"LastUpdate\": \"$(date -u +'%Y-%m-%dT%H:%M:%S.%N%:z')\"
 }"
 }
 
