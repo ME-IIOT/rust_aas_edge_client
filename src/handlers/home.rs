@@ -49,10 +49,10 @@ pub async fn index(
     };
 
     let _id_submodels_dictionary = format!("{}:submodels_dictionary", &app_state.aas_id_short);
-    println!("Submodels Dictionary ID: {}", _id_submodels_dictionary);
-    let submodels_collection_lock = submodels_collection_arc.lock().await;
-
-    let submodels_dictionary_result = aas_interfaces::aas_find_one(_id_submodels_dictionary, submodels_collection_lock.clone()).await;
+    // println!("Submodels Dictionary ID: {}", _id_submodels_dictionary);
+    
+    let submodels_dictionary_result = aas_interfaces::aas_find_one(_id_submodels_dictionary, 
+        submodels_collection_arc.get_ref().clone()).await;
     let submodels_dictionary = match submodels_dictionary_result {
         Ok(submodels_dictionary) => submodels_dictionary,
         Err(e) => {

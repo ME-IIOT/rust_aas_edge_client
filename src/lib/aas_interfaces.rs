@@ -6,19 +6,26 @@ use mongodb::{
     Collection,
     options::UpdateOptions,
 };
+use tokio::sync::Mutex;
+use std::sync::Arc;
 use serde_json::Value;
 use reqwest;
+
+use crate::handlers::submodels;
 // use serde::{Serialize, Deserialize};
 
 // Adjusted to return a Result<Value, String> to better handle success and error states.
 pub async fn aas_find_one(
     _id: String, 
-    collection: mongodb::Collection<mongodb::bson::Document>) 
+    // collection: mongodb::Collection<mongodb::bson::Document>
+    submodels_collection_arc: Arc<Mutex<Collection<Document>>>
+) 
     -> Result<mongodb::bson::Document, String> {
+    let submodels_collection_lock = submodels_collection_arc.lock().await;
     // println!("Finding document with id: {}", _id);
     let filter = doc! { "_id": &_id };
 
-    match collection.find_one(filter, None).await {
+    match submodels_collection_lock.find_one(filter, None).await {
         Ok(Some(document)) => {
             // Optionally remove the _id field from the document if not needed
             let mut document = document.clone(); // Clone if you need to modify the document.
@@ -30,15 +37,21 @@ pub async fn aas_find_one(
     }
 }
 
-pub async fn aas_update_one(_id: String, collection: Collection<Document>, new_document: Document, upsert: bool) -> Result<String, String> {
+pub async fn aas_update_one(_id: String, 
+    submodels_collection: Arc<Mutex<Collection<Document>>>, 
+    new_document: Document, upsert: bool) 
+    -> Result<String, String> 
+{
+    
     let filter = doc! { "_id": _id };
     let options = UpdateOptions::builder().upsert(upsert).build();
 
+    let submodels_collection_lock = submodels_collection.lock().await;
     // GUIDE: Use the '$set' operator for the update, which requires modifying the document structure
     let update = doc! { "$set": new_document };
 
     // Perform the update operation
-    match collection.update_one(filter, update, options).await {
+    match submodels_collection_lock.update_one(filter, update, options).await {
         Ok(update_result) => {
             if let Some(upserted_id) = update_result.upserted_id {
                 Ok(format!("Document upserted with id: {:?}", upserted_id))
@@ -55,11 +68,10 @@ pub async fn get_submodel_database(
     aas_id_short: &str,
     submodel_id_short: &str
 ) -> Result<mongodb::bson::Document, String> {
-    let submodels_collection_lock = submodels_collection_arc.lock().await;
     
     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
 
-    let aas_submodel_result = aas_find_one(_id_submodel, submodels_collection_lock.clone()).await;
+    let aas_submodel_result = aas_find_one(_id_submodel, submodels_collection_arc.clone()).await;
     let aas_submodel = match aas_submodel_result {
         Ok(aas_submodel) => aas_submodel,
         Err(e) => return Err(format!("Error getting submodel: {}", e)),
@@ -75,11 +87,11 @@ pub async fn patch_submodel_database(
     // json: &web::Json<Value> // Use reference since content of json is not changed
     json: &Value
 ) -> Result<String, String> {
-    let submodels_collection_lock = submodels_collection_arc.lock().await;
     
+    let second_submodels_collection_arc = submodels_collection_arc.clone();
     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
 
-    let aas_submodel_result = aas_find_one(_id_submodel.clone(), submodels_collection_lock.clone()).await;
+    let aas_submodel_result = aas_find_one(_id_submodel.clone(), submodels_collection_arc.clone()).await;
     let aas_submodel = match aas_submodel_result {
         Ok(aas_submodel) => aas_submodel,
         Err(e) => return Err(format!("Error getting submodel: {}", e)),
@@ -92,11 +104,12 @@ pub async fn patch_submodel_database(
 
     merge_documents(&aas_submodel, &mut patch_document);
 
-    let update_result = aas_update_one(_id_submodel, submodels_collection_lock.clone(), patch_document, false).await;
+    let update_result = aas_update_one(_id_submodel, second_submodels_collection_arc.clone(), patch_document, false).await;
     match update_result {
         Ok(message) => Ok(message),
         Err(e) => Err(format!("Error patching submodel: {}", e)),
     }
+
 }
 
 fn merge_documents(old_doc: &Document, new_doc: &mut Document) {
@@ -136,11 +149,11 @@ pub async fn patch_submodel_server(
     // json: &web::Json<Value>, // Use reference since content of json is not changed
     json: &Value
 ) -> Result<String, String> {
-    let submodels_collection_lock = submodels_collection_arc.lock().await;
+    // let submodels_collection_lock = submodels_collection_arc.lock().await;
     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
 
-    let submodels_collection = submodels_collection_lock.clone();
-    let aas_submodel = aas_find_one(_id_submodel, submodels_collection).await
+    let submodels_collection = submodels_collection_arc.clone();
+    let aas_submodel = aas_find_one(_id_submodel, submodels_collection_arc.clone()).await
         .map_err(|e| format!("Error getting submodel: {}", e))?;
 
     let mut patch_document: Document = mongodb::bson::to_document(&json)
@@ -148,8 +161,8 @@ pub async fn patch_submodel_server(
 
     merge_documents(&aas_submodel, &mut patch_document);
 
-    let submodels_collection = submodels_collection_lock.clone();
-    let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection).await
+    // let submodels_collection = submodels_collection_arc.clone();
+    let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection.clone()).await
         .map_err(|e| format!("Error getting submodels dictionary: {}", e))?;
 
     let submodel_uid = submodels_dictionary.get_str(submodel_id_short)
@@ -182,8 +195,9 @@ pub async fn fetch_single_submodel_from_server(
     submodel_id_short: &str,
     submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<Collection<Document>>>
 ) -> Result<(), String> {
-    let submodels_collection_lock = submodels_collection_arc.lock().await;
-    let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection_lock.clone()).await;
+    // let submodels_collection_lock = submodels_collection_arc.lock().await;
+    let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), 
+                                                        submodels_collection_arc.clone()).await;
     
     let submodel_uid = match submodels_dictionary {
         Ok(submodels_dictionary) => {
@@ -220,7 +234,7 @@ pub async fn fetch_single_submodel_from_server(
             .map_err(|e| format!("Error converting JSON to BSON: {}", e))?;
 
         if let mongodb::bson::Bson::Document(document) = bson_value {
-            // let collection_lock = submodels_collection.lock().await;
+            let submodels_collection_lock = submodels_collection_arc.lock().await;
             submodels_collection_lock.replace_one(
                 mongodb::bson::doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
                 document,
