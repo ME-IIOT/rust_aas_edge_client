@@ -14,3 +14,18 @@ src/
 |-- config.rs         # Configuration management
 `-- utils.rs          # Utility functions
 ```
+
+## Start MongoDB through Docker compose
+
+``` bash
+sudo docker compose up -d mongodb
+```
+
+## Start backend
+
+### Development
+
+``` bash
+cargo run
+```
+
