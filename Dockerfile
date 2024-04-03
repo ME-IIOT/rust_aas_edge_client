@@ -2,8 +2,8 @@
 FROM rust:1.76 as builder
 
 # Create a new binary project
-RUN USER=root cargo new --bin actix_web_app
-WORKDIR /actix_web_app
+RUN USER=root cargo new --bin rust_web_mongo
+WORKDIR /rust_web_mongo
 
 # Copy the Cargo.toml and Cargo.lock files into the container
 COPY ./Cargo.toml ./Cargo.lock ./
@@ -16,21 +16,26 @@ RUN cargo fetch --locked
 COPY ./src ./src
 
 # Build your application in release mode
-RUN cargo build --release
+# RUN cargo build --release
+RUN cargo build --release && ls /rust_web_mongo/target/release/
 
-# Use Debian buster-slim as the runtime base image
-FROM debian:buster-slim
+
+# Use Debian bullseye-slim as the runtime base image
+FROM debian:bookworm-slim
 
 # Install OpenSSL - required by Actix Web
 RUN apt-get update \
-    && apt-get install -y openssl gcc ca-certificates build-essential libffi-dev bc sysstat\
+    && apt-get install -y openssl libssl3  gcc ca-certificates build-essential libffi-dev bc sysstat\
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from the builder stage to the runtime stage
-COPY --from=builder /actix_web_app/target/release/actix_web_app /usr/local/bin/
+COPY --from=builder /rust_web_mongo/target/release/rust_web_mongo /usr/local/bin/
+
+# Set the working directory
+WORKDIR /app
 
 # Expose the port on which your server will run
 EXPOSE 18000
 
 # Command to run the binary
-CMD ["actix_web_app"]
+CMD ["/usr/local/bin/rust_web_mongo"]

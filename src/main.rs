@@ -1,6 +1,7 @@
 use actix_web::{web, App, HttpServer, middleware::Logger};
 use mongodb;
 use std::env;
+use actix_cors::Cors;
 
 
 async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson::Document>, mongodb::Collection<mongodb::bson::Document>) {
@@ -97,7 +98,13 @@ async fn main() -> std::io::Result<()> {
     }
 
     scheduler_task::submodels_scheduler(app_state.clone(), submodels_collection_arc.clone()).await;
-
+    
+    // CORS setup
+    let cors = Cors::default()
+        .allow_any_origin()
+        .allow_any_method()
+        .allow_any_header();
+    
     HttpServer::new(move || {
         App::new()
             // GUIDE: add logger middleware
@@ -111,7 +118,7 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::config) 
     })
 
-    .bind("127.0.0.1:18000")?
+    .bind("0.0.0.0:18000")?
     .run()
     .await
 }

@@ -16,7 +16,8 @@ pub async fn index(
     // Bind the connection info to a variable to extend its lifetime.
     let conn_info = req.connection_info();
     // Retrieve the client's IP address. If it's not available, use a default value.
-    let ip = conn_info.realip_remote_addr().unwrap_or("unknown");
+    // let ip = conn_info.realip_remote_addr().unwrap_or("unknown");
+    let ip = conn_info.host();
 
     // Retrieve the request scheme (protocol). If it's not available, default to "http".
     let scheme_str = conn_info.scheme(); // Assuming this is &str
