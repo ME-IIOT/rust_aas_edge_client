@@ -1,4 +1,4 @@
-use actix_web::{web::{self, Data, Json, Path}, HttpResponse, Responder};
+use actix_web::{web::{self, Data, Path}, HttpResponse, Responder};
 use mongodb::{bson::Document, Collection};
 use std::sync::Arc;
 use tokio::sync::Mutex;

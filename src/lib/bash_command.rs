@@ -1,5 +1,5 @@
 use tokio::process::Command;
-use anyhow::{Result, anyhow};
+use anyhow:: anyhow;
 
 /// Executes a bash script and returns its output as a String.
 pub async fn run_bash_script(script_path: &str) -> anyhow::Result<String> {

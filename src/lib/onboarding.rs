@@ -7,6 +7,9 @@ use anyhow;
 use anyhow::Context;
 use tokio;
 use futures;
+use chrono::{DateTime, Utc};
+
+use super::aas_interfaces;
 
 // TODO: Missing shell collection
 async fn fetch_single_submodel(
@@ -16,7 +19,7 @@ async fn fetch_single_submodel(
     submodel_uid: &str,
     submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
     submodels_dictionary: std::sync::Arc<tokio::sync::Mutex<mongodb::bson::Document>>,
-    onboarding: bool,
+    _onboarding: bool,
 ) -> std::result::Result<(), actix_web::Error> {
     let submodel_id_short_url = format!(
         "{}shells/{}/submodels/{}",
@@ -145,7 +148,7 @@ async fn fetch_all_submodels(
 ) -> Result<(), actix_web::Error> {
     
     // println!("Fetching submodels from {}", aas_id_short);
-    println!("{:?}", submodel_uids);
+    // println!("{:?}", submodel_uids);
     let submodels_dictionary = std::sync::Arc::new(tokio::sync::Mutex::new(mongodb::bson::Document::new()));
 
     let fetch_tasks: Vec<_> = submodel_uids.into_iter().map(|submodel_uid| {
@@ -167,6 +170,7 @@ async fn fetch_all_submodels(
             ).await {
                 Ok(_) => {},
                 Err(e) => {
+                    eprintln!("Failed to fetch submodel: {}", e);
                     // Handle error appropriately, ensuring it doesn't require passing non-Send types across threads
                 }
             }
@@ -241,7 +245,7 @@ pub async fn edge_device_onboarding(
             aasx_server,
             aas_id_short,
             submodels_id,
-            submodels_collection,
+            submodels_collection.clone(),
             aas_uid,
             true,
         ).await?;
@@ -253,9 +257,55 @@ pub async fn edge_device_onboarding(
         )));
     }
 
+    onboarding_managed_device(
+        &aas_id_short, 
+        &aasx_server, 
+        &aas_uid, 
+        submodels_collection.clone()
+    ).await;
+
     Ok(())
 }
 
+async fn onboarding_managed_device(
+    aas_id_short: &str,
+    aasx_server_url: &str,
+    aas_uid: &str,
+    submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+){
+    let time_now = Utc::now();
+    let submodel_id_short = "ManagedDevice";
+    let json = serde_json::json!({
+        "BoardingStatus": "ONBOARDED",
+        "LastUpdate": time_now.to_rfc3339()
+    });    
+    match aas_interfaces::patch_submodel_database(
+        submodels_collection.clone(), 
+        &aas_id_short, 
+        &submodel_id_short, 
+        &json).await{
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("Failed to patch submodel: {}", e);
+                return;
+            }
+    };
+
+    match aas_interfaces::patch_submodel_server(
+        submodels_collection.clone(),
+        &aas_id_short, 
+        &submodel_id_short, 
+        &aasx_server_url, 
+        &aas_uid, 
+        &json
+        ).await{
+            Ok(_) => println!("Successful startup onboarding"),
+            Err(e) => {
+                eprintln!("Failed to patch submodel: {}", e);
+                return;
+        }
+    };
+}
 // fn extract_submodels_id(data: &serde_json::Value) -> Result<Vec<String>, actix_web::Error> {
 //     let mut filtered_values = Vec::new();
 

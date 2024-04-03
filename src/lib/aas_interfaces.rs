@@ -1,5 +1,5 @@
 // use std::clone;
-use actix_web::{web, HttpResponse, Responder};
+
 use anyhow::Context;
 use mongodb::{
     bson::{ doc, Bson, Document},
@@ -11,7 +11,6 @@ use std::sync::Arc;
 use serde_json::Value;
 use reqwest;
 
-use crate::handlers::submodels;
 // use serde::{Serialize, Deserialize};
 
 // Adjusted to return a Result<Value, String> to better handle success and error states.

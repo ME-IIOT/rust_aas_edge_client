@@ -32,26 +32,25 @@ display_system_info() {
 
     # Output as JSON
     echo -e "{
-    \"HealthStatus\": \"NORMAL\",
-    \"Hardware\": {
-        \"Processor\": {
-            \"CpuType\": \"$CPU_TYPE\",
-            \"CpuCores\": \"$CPU_CORES\",
-            \"CpuClock\": \"$CPU_CLOCK\",
-            \"CpuUsage\": \"$CPU_USAGE\",
-            \"CpuTemperature\": \"$CPU_TEMPERATURE\"
+        \"HealthStatus\": \"NORMAL\",
+        \"Hardware\": {
+            \"Processor\": {
+                \"CpuType\": \"$CPU_TYPE\",
+                \"CpuCores\": \"$CPU_CORES\",
+                \"CpuClock\": \"$CPU_CLOCK\",
+                \"CpuUsage\": \"$CPU_USAGE\",
+                \"CpuTemperature\": \"$CPU_TEMPERATURE\"
+            },
+            \"Memory\": {
+                \"RAMInstalled\": \"$RAM_INSTALLED\",
+                \"RAMFree\": \"$RAM_FREE\",
+                \"DiskInstalled\": \"$DISK_INSTALLED\",
+                \"DiskFree\": \"$DISK_FREE\"
+            },
+            \"BoardTemperature\": \"$BOARD_TEMPERATURE\"
         },
-        \"Memory\": {
-            \"RAMInstalled\": \"$RAM_INSTALLED\",
-            \"RAMFree\": \"$RAM_FREE\",
-            \"DiskInstalled\": \"$DISK_INSTALLED\",
-            \"DiskFree\": \"$DISK_FREE\"
-        },
-        \"BoardTemperature\": \"$BOARD_TEMPERATURE\"
-    },
-    \"LastUpdate\": \"$(date -u +'%Y-%m-%dT%H:%M:%S.%N%:z')\"
-}"
+        \"LastUpdate\": \"$(date -u +'%Y-%m-%dT%H:%M:%S.%N%:z')\"
+    }"
 }
-
 # Call the function to display the information
 display_system_info

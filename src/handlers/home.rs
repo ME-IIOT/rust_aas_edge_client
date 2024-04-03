@@ -1,9 +1,8 @@
-use actix_web::{HttpResponse, Responder, HttpRequest, web};
+use actix_web::web;
 use mongodb::{bson::{self, doc, Bson, Document}, Collection};
-use serde_json::{json, Value};
+use serde_json;
 use tokio::sync::Mutex;
 use std::sync::Arc;
-use futures::stream::StreamExt;
 
 use crate::state::AppState;
 use crate::lib::aas_interfaces;
@@ -12,7 +11,7 @@ use crate::lib::aas_interfaces;
 pub async fn index(
     req: actix_web::HttpRequest, 
     app_state: actix_web::web::Data<AppState>,
-    submodels_collection_arc: web::Data<std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>>
+    submodels_collection_arc: web::Data<Arc<Mutex<Collection<Document>>>>
 ) -> impl actix_web::Responder {
     // Bind the connection info to a variable to extend its lifetime.
     let conn_info = req.connection_info();

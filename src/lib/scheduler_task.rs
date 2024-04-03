@@ -2,10 +2,10 @@ use clokwerk::{Scheduler, TimeUnits};
 use actix_web::web;
 use std::time::Duration;
 use tokio::{self, sync::Mutex};
-use serde_json::{Value, Error, json};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use mongodb::{bson::Document, Collection};
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, Utc};
 
 use crate::state::AppState;
 use crate::lib::{aas_interfaces,bash_command};
