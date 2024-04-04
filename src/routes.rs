@@ -30,6 +30,9 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 // .route(web::post().to(handlers::book::add_book))
         )
         .service(
+            web::resource("/openapi")
+                .route(web::get().to(handlers::openapi::openapi_endpoint)))
+        .service(
             web::resource("/").route(web::get().to(handlers::home::index))
         );
 
