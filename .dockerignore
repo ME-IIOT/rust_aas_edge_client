@@ -4,10 +4,6 @@ target/
 # Ignore any hidden files or directories
 .*
 
-# Ignore development files
-Cargo.lock
-Cargo.toml
-
 # Ignore any build artifacts
 **/*.rs.bk
 

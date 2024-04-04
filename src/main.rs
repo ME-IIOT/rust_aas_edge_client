@@ -28,6 +28,16 @@ async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson
     let shells_collection = db.collection::<mongodb::bson::Document>("shells");
     let submodels_collection = db.collection::<mongodb::bson::Document>("submodels");
 
+    // Clean up old data in the collections.
+    match shells_collection.delete_many(mongodb::bson::doc! {}, None).await {
+        Ok(_) => (),
+        Err(e) => eprintln!("Failed to clean up shells collection: {}", e),
+    }
+    match submodels_collection.delete_many(mongodb::bson::doc! {}, None).await {
+        Ok(_) => (),
+        Err(e) => eprintln!("Failed to clean up submodels collection: {}", e),
+    }
+
     // Return the database and collections; if any of the above steps fail, the function will have already panicked.
     (db, shells_collection, submodels_collection)
 }

@@ -1,5 +1,5 @@
 use actix_web::web;
-use mongodb::{bson::{self, doc, Bson, Document}, Collection};
+use mongodb::{bson::{Bson, Document}, Collection};
 use serde_json;
 use tokio::sync::Mutex;
 use std::sync::Arc;

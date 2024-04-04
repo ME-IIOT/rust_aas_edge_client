@@ -255,6 +255,18 @@ pub async fn fetch_single_submodel_from_server(
     
 }
 
+pub async fn read_managed_device(
+    submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+    aas_id_short: &str
+) -> Result<mongodb::bson::Document, String> {
+    let table_id = format!("{}:{}", aas_id_short, "ManagedDevice");
+    
+    let managed_device = aas_find_one(table_id, submodels_collection_arc.clone()).await;
+    match managed_device {
+        Ok(managed_device) => Ok(managed_device),
+        Err(e) => Err(format!("Failed to find managed device: {}", e)),
+    }
+}
 // No need 
 // pub fn aas_sm_2_client_json(submodel_elements: Vec<mongodb::bson::Document>) -> mongodb::bson::Document {
 //     let mut client_json = mongodb::bson::Document::new();

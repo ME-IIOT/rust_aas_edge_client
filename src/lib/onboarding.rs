@@ -7,7 +7,7 @@ use anyhow;
 use anyhow::Context;
 use tokio;
 use futures;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 use super::aas_interfaces;
 
@@ -273,6 +273,16 @@ async fn onboarding_managed_device(
     aas_uid: &str,
     submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
 ){
+    match aas_interfaces::read_managed_device(
+        submodels_collection.clone(), 
+        aas_id_short).await{
+        Ok(_) => (),
+        Err(e) => {
+            eprintln!("Failed to read managed device: {}", e);
+            return;
+        }
+    };
+    
     let time_now = Utc::now();
     let submodel_id_short = "ManagedDevice";
     let json = serde_json::json!({

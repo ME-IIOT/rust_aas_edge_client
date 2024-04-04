@@ -7,7 +7,7 @@ use std::io::Read;
 // Define a struct to deserialize the query parameters
 #[derive(Deserialize)]
 struct QueryParams {
-    dataFormat: Option<String>,
+    data_format: Option<String>,
 }
 
 pub async fn openapi_endpoint(req: HttpRequest) -> impl Responder {
@@ -15,7 +15,7 @@ pub async fn openapi_endpoint(req: HttpRequest) -> impl Responder {
     let query_params = web::Query::<QueryParams>::from_query(req.query_string());
     
     if let Ok(params) = query_params {
-        if params.dataFormat.as_deref() == Some("json") {
+        if params.data_format.as_deref() == Some("json") {
             // Path to your YAML file
             let path = "./static/openapi.yaml";
             let mut file = match File::open(path) {

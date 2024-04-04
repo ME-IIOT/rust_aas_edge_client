@@ -40,19 +40,30 @@ async fn server_pushing(app_data: web::Data<AppState>,
         &json).await{
             Ok(_) => (),
             Err(e) => {
-                eprintln!("Failed to patch submodel: {}", e);
+                eprintln!("Failed to patch submodel to database: {}", e);
                 return;
             }
     };
 
-    let table_id = format!("{}:{}", &app_data.aas_id_short, "ManagedDevice");
+    // let table_id = format!("{}:{}", &app_data.aas_id_short, "ManagedDevice");
     
-    let managed_device = match aas_interfaces::aas_find_one(table_id,         
-        submodels_collection_arc.clone()
+    // let managed_device = match aas_interfaces::aas_find_one(table_id,         
+    //     submodels_collection_arc.clone()
+    // ).await{
+    //     Ok(managed_device) => managed_device,
+    //     Err(e) => {
+    //         eprintln!("Failed to find managed device: {}", e);
+    //         return;
+    //     }
+    // };
+
+    let managed_device = match aas_interfaces::read_managed_device(
+        submodels_collection_arc.clone(),
+        &app_data.aas_id_short,
     ).await{
         Ok(managed_device) => managed_device,
         Err(e) => {
-            eprintln!("Failed to find managed device: {}", e);
+            eprintln!("Failed to read managed device: {}", e);
             return;
         }
     };
@@ -160,7 +171,7 @@ async fn server_pushing(app_data: web::Data<AppState>,
         ).await{
             Ok(_) => println!("Successful pushing system information to server"),
             Err(e) => {
-                eprintln!("Failed to patch submodel server: {}", e);
+                eprintln!("Failed to patch submodel to server: {}", e);
                 return;
             }
         };
@@ -176,10 +187,14 @@ async fn server_pushing(app_data: web::Data<AppState>,
         ).await{
             Ok(_) => println!("Successful pushing system information to server"),
             Err(e) => {
-                eprintln!("Failed to patch submodel server: {}", e);
+                eprintln!("Failed to patch submodel to server: {}", e);
                 return;
             }
         };
+    }
+    else{
+        eprintln!("Invalid boarding status");
+        return;
     }
     
     // Task one logic here

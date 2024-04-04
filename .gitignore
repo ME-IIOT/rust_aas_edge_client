@@ -16,3 +16,4 @@ Cargo.lock
 
 /db
 .vscode/
+/docker_compose_package

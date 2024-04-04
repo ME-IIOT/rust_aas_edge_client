@@ -105,8 +105,18 @@ pub async fn patch_submodel(
             Err(e) => return actix_web::HttpResponse::InternalServerError().body(format!("Error patching submodel in database: {}", e)),
     };
 
+    let submodels_collection_2nd = submodels_collection_arc.get_ref().clone();
+
+    match aas_interfaces::read_managed_device(
+        submodels_collection_2nd.clone(), 
+        &app_data.aas_id_short
+    ).await{
+        Ok(managed_device) => managed_device,
+        Err(e) => return actix_web::HttpResponse::InternalServerError().body(format!("Error patching submodel to server: {}", e)),
+    };
+    
     match aas_interfaces::patch_submodel_server(
-        submodels_collection_arc.get_ref().clone(), 
+        submodels_collection_2nd.clone(), 
         &app_data.aas_id_short, 
         &submodel_id_short, 
         &app_data.aasx_server, 
@@ -114,7 +124,7 @@ pub async fn patch_submodel(
         &json
     ).await{
         Ok(_) => HttpResponse::Ok().body("Submodel patched successfully"),
-        Err(e) => HttpResponse::InternalServerError().body(format!("Error patching submodel on server: {}", e)),
+        Err(e) => HttpResponse::InternalServerError().body(format!("Error patching submodel to server: {}", e)),
     };
 
     HttpResponse::Ok().body("Submodel patched successfully")
