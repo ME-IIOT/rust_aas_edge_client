@@ -24,10 +24,13 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         //         .route(web::post().to(handlers::database::add_database))
         //         .route(web::put().to(handlers::database::update_database)));
         .service(
+            web::resource("/submodels")
+                .route(web::get().to(handlers::submodels::get_submodels))
+        )
+        .service(
             web::resource("/submodels/{submodel_id}")
                 .route(web::get().to(handlers::submodels::get_submodel))
                 .route(web::patch().to(handlers::submodels::patch_submodel))
-                // .route(web::post().to(handlers::book::add_book))
         )
         .service(
             web::resource("/").route(web::get().to(handlers::home::index))

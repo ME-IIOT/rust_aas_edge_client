@@ -100,15 +100,27 @@ async fn main() -> std::io::Result<()> {
     scheduler_task::submodels_scheduler(app_state.clone(), submodels_collection_arc.clone()).await;
     
     // CORS setup
-    let cors = Cors::default()
-        .allow_any_origin()
-        .allow_any_method()
-        .allow_any_header();
+    // let cors = Cors::default()
+    //     .allow_any_origin()
+    //     .allow_any_method()
+    //     .allow_any_header();
+    
     
     HttpServer::new(move || {
+        let cors = Cors::default()
+            // .allowed_origin("https://example.com") // Allow only a specific domain
+            // .allowed_methods(vec!["GET", "POST", "PATCH", "PUT"]) // Allow only specific methods
+            // .allowed_headers(vec![actix_web::http::header::AUTHORIZATION, actix_web::http::header::ACCEPT])
+            // .allowed_header(actix_web::http::header::CONTENT_TYPE)
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
+
         App::new()
             // GUIDE: add logger middleware
             .wrap(Logger::default())
+            .wrap(cors)
             // GUIDE: pass shared data to the app
             .app_data(app_state.clone())
             .app_data(web::Data::new(db.clone()))

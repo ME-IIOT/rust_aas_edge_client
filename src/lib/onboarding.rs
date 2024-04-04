@@ -306,29 +306,6 @@ async fn onboarding_managed_device(
         }
     };
 }
-// fn extract_submodels_id(data: &serde_json::Value) -> Result<Vec<String>, actix_web::Error> {
-//     let mut filtered_values = Vec::new();
-
-//     // Access "submodels" field, defaulting to an empty array if not found
-//     let submodels = data.get("submodels").and_then(|v| v.as_array()).unwrap_or(&vec![]);
-
-//     for submodel in submodels {
-//         // Check if the submodel's type is "ModelReference"
-//         if submodel.get("type").and_then(|t| t.as_str()) == Some("ModelReference") {
-//             // Extract the value from the first element in "keys", if any
-//             let value = submodel.get("keys")
-//                 .and_then(|k| k.as_array())
-//                 .and_then(|arr| arr.get(0))
-//                 .and_then(|k| k.get("value"))
-//                 .and_then(|v| v.as_str());
-
-//             if let Some(value_str) = value {
-//                 filtered_values.push(value_str.to_string());
-//             }
-//         }
-//     }
-//     Ok(filtered_values)
-// }
 
 fn extract_submodels_id(data: &mongodb::bson::Document) -> Result<Vec<String>, actix_web::Error> {
     let mut filtered_values = Vec::new();

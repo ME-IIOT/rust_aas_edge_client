@@ -4,9 +4,52 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use serde_json::{json, Value};
 use chrono;
+use futures::future::try_join_all;
+use std::collections::HashMap;
+
 
 use crate::lib::aas_interfaces;
 use crate::state::AppState;
+
+pub async fn get_submodels(
+    submodels_collection_arc: Data<Arc<Mutex<Collection<Document>>>>,
+    app_data : Data<AppState>
+) -> impl Responder {
+    // using get_ref() to get the reference to the inner data
+    let submodels_collection = submodels_collection_arc.get_ref().clone();
+    
+    let submodels_dictionary_id = format!("{}:submodels_dictionary", &app_data.aas_id_short);
+    let submodels_dictionary = match aas_interfaces::aas_find_one(submodels_dictionary_id, 
+                                        submodels_collection.clone()).await{
+        Ok(submodels_dictionary) => submodels_dictionary,
+        Err(e) => return actix_web::HttpResponse::InternalServerError().body(format!("Error getting submodels dictionary: {}", e)),
+    };
+
+    let keys: Vec<String> = submodels_dictionary.keys().cloned().collect();
+
+    let fetch_tasks = keys.into_iter().map(|key| {
+        let collection_clone = submodels_collection.clone();
+        let aas_id_short_clone = app_data.aas_id_short.clone();
+        async move {
+            aas_interfaces::get_submodel_database(
+                collection_clone,
+                &aas_id_short_clone,
+                &key,
+            )
+            .await
+            .map(|submodel| (key, submodel))
+        }
+    });
+
+    match try_join_all(fetch_tasks).await {
+        Ok(results) => {
+            let submodels_map: HashMap<String, Document> = results.into_iter().collect();
+            HttpResponse::Ok().json(submodels_map) // send the map as a JSON response
+        }
+        Err(e) => HttpResponse::InternalServerError().body(format!("Error getting submodels: {}", e)),
+    }
+}
+
 pub async fn get_submodel(
     submodels_collection_arc: Data<Arc<Mutex<Collection<Document>>>>,
     path: Path<String>,

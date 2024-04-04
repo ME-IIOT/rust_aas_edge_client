@@ -45,6 +45,7 @@ pub async fn index(
         // In Rust, values can only have one owner at a time, and when you pass a value to another variable or function
         // without using a reference or cloning, the ownership is transferred (moved), and the original variable can no longer be used.
         "base": format!("{}api/", url.clone()),
+        // "base": format!("{}", url.clone()),
         "links": []
     };
 
@@ -63,8 +64,8 @@ pub async fn index(
 
     for (key, _) in submodels_dictionary.iter() {
         let link_object = mongodb::bson::doc! {
-            "href": key,
-            "rel": format!("/submodels/{}", key),
+            "href": format!("/submodels/{}", key),
+            "rel": key,
             "method": "GET"
         };
         bson_data.get_array_mut("links").unwrap().push(Bson::Document(link_object));
