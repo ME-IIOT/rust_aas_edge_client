@@ -48,7 +48,7 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: test_rs/YOUR_IMAGE_NAME:${{ env.NEXT_VERSION }}
+          tags: manhlinh210/test_rs:${{ env.NEXT_VERSION }}
           platforms: ${{ matrix.docker_platform }}
       
       - name: Tag the new version in Git
