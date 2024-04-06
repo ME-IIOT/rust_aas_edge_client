@@ -29,3 +29,19 @@ sudo docker compose up -d mongodb
 cargo run
 ```
 
+### Specify the architecture with docker compose
+
+``` bash
+services:
+  web:
+    image: manhlinh210/rust_web_mongo:1.0.1 # <- change tag here
+    platform: linux/amd64 # <- change architecture here: linux/arm64
+```
+
+### Build multiple image at parallel
+
+Dont forget to change tag
+
+``` bash
+docker buildx build --platform linux/amd64,linux/arm64/v8 --tag manhlinh210/rust_web_mongo:1.0.1 --push .
+```

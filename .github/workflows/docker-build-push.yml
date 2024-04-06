@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        docker_platform: ['linux/amd64', 'linux/arm64/v8']
+        # docker_platform: ['linux/amd64', 'linux/arm64/v8'] <- use runner/selfhost with arm chip to build, github action use amd64, take 1 hour to build arm image
+        docker_platform: ['linux/amd64']
       fail-fast: false
     steps:
       - name: Check out the repo
@@ -48,7 +49,7 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: manhlinh210/test_rs:${{ env.NEXT_VERSION }}
+          tags: manhlinh210/rust_aas_edge_client:${{ env.NEXT_VERSION }}
           platforms: ${{ matrix.docker_platform }}
       
       - name: Tag the new version in Git
