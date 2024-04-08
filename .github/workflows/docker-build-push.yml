@@ -43,8 +43,19 @@ jobs:
           echo ::set-output name=version::$NEXT_VERSION
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+      # - name: Set up Docker Buildx
+      #   uses: docker/setup-buildx-action@v1 -> failure by arm64
+      - name: Manually install Docker Buildx (ARM only)
+        if: matrix.docker_platform == 'linux/arm64/v8'
+        run: |
+          mkdir -p ~/.docker/cli-plugins/
+          wget -O ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.12.1/buildx-v0.12.1.linux-arm64
+          chmod a+x ~/.docker/cli-plugins/docker-buildx
+          docker buildx create --use
+
+      - name: Set up Docker Buildx (AMD only)
+        if: matrix.docker_platform == 'linux/amd64'
+        uses: docker/setup-buildx-action@v1      
 
       - name: Log in to DockerHub
         uses: docker/login-action@v1
