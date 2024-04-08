@@ -45,23 +45,24 @@ jobs:
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      # - name: Manually install Docker Buildx (ARM only)
-      #   if: matrix.docker_platform == 'linux/arm64/v8'
-      #   run: |
-      #     mkdir -p ~/.docker/cli-plugins/
-      #     wget -O ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.12.1/buildx-v0.12.1.linux-arm64
-      #     chmod a+x ~/.docker/cli-plugins/docker-buildx
-      #     docker buildx create --use
-
-      # - name: Set up Docker Buildx (AMD only)
-      #   if: matrix.docker_platform == 'linux/amd64'
-      #   uses: docker/setup-buildx-action@v1      
 
       - name: Log in to DockerHub
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      # Can add more architecture if needed
+      - name: Determine tag suffix
+        run: |
+          if [ "${{ matrix.docker_platform }}" == "linux/arm64/v8" ]; then
+            echo "TAG_SUFFIX=arm64-${{ env.NEXT_VERSION }}" >> $GITHUB_ENV
+          elif [ "${{ matrix.docker_platform }}" == "linux/amd64" ]; then
+            echo "TAG_SUFFIX=amd64-${{ env.NEXT_VERSION }}" >> $GITHUB_ENV
+          # Add more architectures here
+          else
+            echo "TAG_SUFFIX=unknown-${{ env.NEXT_VERSION }}" >> $GITHUB_ENV
+          fi
       
       - name: Build and push
         uses: docker/build-push-action@v2
@@ -69,8 +70,9 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: manhlinh210/rust_aas_edge_client:${{ matrix.docker_platform }}_${{ env.NEXT_VERSION }}
+          tags: manhlinh210/rust_aas_edge_client:${{ env.TAG_SUFFIX }}
           platforms: ${{ matrix.docker_platform }}
+
       
       - name: Tag the new version in Git
         run: |
