@@ -26,12 +26,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
       
-      # Step to debug
-      - name: Check current user and groups
-        run: |
-          whoami
-          groups
-      
       - name: Calculate next version
         id: nextver
         run: |
@@ -75,7 +69,7 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: manhlinh210/rust_aas_edge_client:${{ env.NEXT_VERSION }}
+          tags: manhlinh210/rust_aas_edge_client:${{ matrix.docker_platform }}_${{ env.NEXT_VERSION }}
           platforms: ${{ matrix.docker_platform }}
       
       - name: Tag the new version in Git

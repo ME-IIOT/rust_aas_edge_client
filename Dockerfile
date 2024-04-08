@@ -17,7 +17,7 @@ COPY ./src ./src
 
 # Build your application in release mode
 # RUN cargo build --release
-RUN cargo build --release && ls /rust_web_mongo/target/release/
+RUN cargo build --release
 
 
 # Use Debian bullseye-slim as the runtime base image
