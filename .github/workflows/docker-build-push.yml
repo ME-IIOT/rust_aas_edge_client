@@ -26,6 +26,12 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
       
+      # Step to debug
+      - name: Check current user and groups
+        run: |
+          whoami
+          groups
+      
       - name: Calculate next version
         id: nextver
         run: |
