@@ -20,7 +20,7 @@ jobs:
           - docker_platform: 'linux/amd64'
             runner_label: 'ubuntu-latest'
           - docker_platform: 'linux/arm64/v8'
-            runner_label: 'self-hosted-arm' # Label for your self-hosted ARM runner
+            runner_label: 'self-hosted' # Label for your self-hosted ARM runner
       fail-fast: false
     steps:
       - name: Check out the repo
