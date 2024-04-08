@@ -45,3 +45,11 @@ Dont forget to change tag
 ``` bash
 docker buildx build --platform linux/amd64,linux/arm64/v8 --tag manhlinh210/rust_web_mongo:1.0.1 --push .
 ```
+
+## Branch
+
+main: Update this when you have stable version
+
+dev: Development branch
+
+build: when you push on this branch, it will run the workflow, build and push docker image to docker hub
