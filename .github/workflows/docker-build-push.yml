@@ -7,11 +7,20 @@ on:
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
+    # runs-on: ubuntu-latest
+    # strategy:
+    #   matrix:
+    #     # docker_platform: ['linux/amd64', 'linux/arm64/v8'] <- use runner/selfhost with arm chip to build, github action use amd64, take 1 hour to build arm image
+    #     docker_platform: ['linux/amd64']
+    #   fail-fast: false
+    runs-on: ${{ matrix.runner_label }}
     strategy:
       matrix:
-        # docker_platform: ['linux/amd64', 'linux/arm64/v8'] <- use runner/selfhost with arm chip to build, github action use amd64, take 1 hour to build arm image
-        docker_platform: ['linux/amd64']
+        include:
+          - docker_platform: 'linux/amd64'
+            runner_label: 'ubuntu-latest'
+          - docker_platform: 'linux/arm64/v8'
+            runner_label: 'self-hosted-arm' # Label for your self-hosted ARM runner
       fail-fast: false
     steps:
       - name: Check out the repo

@@ -16,4 +16,4 @@ target/
 
 /db
 .vscode/
-/docker_compose_package
+# /docker_compose_package
