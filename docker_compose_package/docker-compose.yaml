@@ -8,6 +8,8 @@ services:
     image: manhlinh210/rust_aas_edge_client:amd64-1.0.0
     ports:
       - "18000:18000"
+    env_file:
+      - aas_client.env
     volumes:
       - /proc/meminfo:/host_proc/meminfo:ro
       - ./aas_client.env:/app/aas_client.env

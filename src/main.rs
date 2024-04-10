@@ -42,12 +42,12 @@ async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson
     (db, shells_collection, submodels_collection)
 }
 
-// Load environment variables from aas_client.env file
-async fn load_env() {
-    if let Err(e) = dotenv::from_filename("aas_client.env") {
-        eprintln!("Error loading .env file: {}", e);
-    }
-}
+// // Load environment variables from aas_client.env file
+// async fn load_env() {
+//     if let Err(e) = dotenv::from_filename("aas_client.env") {
+//         eprintln!("Error loading .env file: {}", e);
+//     }
+// }
 
 
 
@@ -66,7 +66,7 @@ use lib::scheduler_task;
 async fn main() -> std::io::Result<()> {
 
     // Load environment variables from .env file
-    load_env().await;
+    // load_env().await;
     
     // GUIDE: set env var for logging
     std::env::set_var("RUST_LOG", "actix_web=info");

@@ -17,3 +17,5 @@ target/
 /db
 .vscode/
 # /docker_compose_package
+
+/venv
