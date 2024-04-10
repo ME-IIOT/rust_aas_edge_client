@@ -53,3 +53,5 @@ main: Update this when you have stable version
 dev: Development branch
 
 build: when you push on this branch, it will run the workflow, build and push docker image to docker hub
+
+Trigger push
