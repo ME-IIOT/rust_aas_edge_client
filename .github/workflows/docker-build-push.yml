@@ -76,5 +76,11 @@ jobs:
       
       - name: Tag the new version in Git
         run: |
-          git tag $NEXT_VERSION
-          git push origin $NEXT_VERSION
+          # Check if the tag already exists
+          if git rev-parse $NEXT_VERSION >/dev/null 2>&1; then
+              echo "Tag $NEXT_VERSION already exists. Skipping."
+          else
+              # If the tag does not exist, create and push it
+              git tag $NEXT_VERSION
+              git push origin $NEXT_VERSION
+          fi

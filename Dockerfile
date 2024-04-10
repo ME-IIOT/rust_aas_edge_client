@@ -25,7 +25,17 @@ FROM debian:bookworm-slim
 
 # Install OpenSSL - required by Actix Web
 RUN apt-get update \
-    && apt-get install -y openssl libssl3  gcc ca-certificates build-essential libffi-dev bc sysstat\
+    && apt-get install -y\
+    openssl \
+    libssl3 \
+    gcc \
+    ca-certificates \
+    build-essential \
+    libffi-dev \
+    bc \
+    sysstat \
+    curl \
+    iputils-ping \ 
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from the builder stage to the runtime stage

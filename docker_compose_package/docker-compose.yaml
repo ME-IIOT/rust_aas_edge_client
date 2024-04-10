@@ -5,7 +5,7 @@ networks:
 
 services:
   actix_web_app:
-    image: manhlinh210/rust_aas_edge_client:amd64-1.0.0
+    image: manhlinh210/rust_aas_edge_client:amd64-1.0.9
     ports:
       - "18000:18000"
     env_file:
@@ -20,7 +20,7 @@ services:
       - mongodb
 
   mongodb:
-    image: mongo:4.4
+    image: mongo:4.4.18
     container_name: rust_web_mongo-4.4
     ports:
       - "27015:27017"
@@ -47,7 +47,7 @@ services:
   # nginx container service serving the frontend and the backend
   nginx:
     container_name: lni-aas-edge-client-nginx
-    image: nginx:1.19.0-alpine
+    image: nginx:1.19.0 # use the official Nginx image
     ports:
       - "8081:8081"
     volumes:
