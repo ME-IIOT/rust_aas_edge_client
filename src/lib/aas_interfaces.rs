@@ -101,9 +101,9 @@ pub async fn patch_submodel_database(
         Err(e) => return Err(format!("Error parsing request body: {}", e)),
     };
 
-    merge_documents(&aas_submodel, &mut patch_document);
+    let merged_doc = merge_documents(&aas_submodel, &mut patch_document);
 
-    let update_result = aas_update_one(_id_submodel, second_submodels_collection_arc.clone(), patch_document, false).await;
+    let update_result = aas_update_one(_id_submodel, second_submodels_collection_arc.clone(), merged_doc, false).await;
     match update_result {
         Ok(message) => Ok(message),
         Err(e) => Err(format!("Error patching submodel: {}", e)),
@@ -111,32 +111,27 @@ pub async fn patch_submodel_database(
 
 }
 
-fn merge_documents(old_doc: &Document, new_doc: &mut Document) {
-    let keys_to_remove: Vec<String> = new_doc.keys()
-        .filter(|k| !old_doc.contains_key(*k))
-        .cloned()
-        .collect();
+fn merge_documents(old_doc: &Document, new_doc: &Document) -> Document {
+    let mut merged_doc = old_doc.clone(); // Clone old_doc to preserve its structure
 
-    for key in keys_to_remove {
-        new_doc.remove(&key);
-    }
-
-    for (key, old_value) in old_doc {
-        match new_doc.get(key) {
-            Some(new_value) => {
-                if let (Bson::Document(old_subdoc), Bson::Document(new_subdoc)) = (old_value, new_value) {
-                    let mut new_subdoc = new_subdoc.clone();
-                    merge_documents(old_subdoc, &mut new_subdoc);
-                    new_doc.insert(key, Bson::Document(new_subdoc));
-                }
+    // Iterate over old_doc to preserve its keys and structure
+    for (key, old_value) in old_doc.iter() {
+        // Check if new_doc has a value for the current key
+        if let Some(new_value) = new_doc.get(key) {
+            // Deep merge if both values are documents
+            if let (Bson::Document(old_subdoc), Bson::Document(new_subdoc)) = (old_value, new_value) {
+                let merged_subdoc = merge_documents(old_subdoc, new_subdoc);
+                merged_doc.insert(key.clone(), Bson::Document(merged_subdoc));
+            } else {
+                // Update with new value if not a sub-document
+                merged_doc.insert(key.clone(), new_value.clone());
             }
-            None => {
-                new_doc.insert(key, old_value.clone());
-            },
         }
+        // If new_doc does not have the current key, old_value remains unchanged
     }
-}
 
+    merged_doc
+}
 
 
 pub async fn patch_submodel_server(
@@ -158,8 +153,8 @@ pub async fn patch_submodel_server(
     let mut patch_document: Document = mongodb::bson::to_document(&json)
         .map_err(|e| format!("Error parsing request body: {}", e))?;
 
-    merge_documents(&aas_submodel, &mut patch_document);
-
+    let merged_doc = merge_documents(&aas_submodel, &mut patch_document);
+    
     // let submodels_collection = submodels_collection_arc.clone();
     let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection.clone()).await
         .map_err(|e| format!("Error getting submodels dictionary: {}", e))?;
@@ -176,7 +171,7 @@ pub async fn patch_submodel_server(
     );
 
     let response = client.patch(&url)
-        .json(&patch_document)
+        .json(&merged_doc)
         .send()
         .await
         .map_err(|e| format!("Error sending patch request: {}", e))?;
