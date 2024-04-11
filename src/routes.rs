@@ -39,7 +39,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             web::resource("/").route(web::get().to(handlers::home::index))
         )
         .service(
-            web::resource("/thumbnail").route(web::get().to(handlers::thumbnail::get_thumbnail))
+            web::resource("/picture").route(web::get().to(handlers::thumbnail::get_thumbnail))
         );
 
 }

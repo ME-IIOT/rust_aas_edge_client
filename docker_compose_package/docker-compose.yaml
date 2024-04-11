@@ -5,7 +5,7 @@ networks:
 
 services:
   actix_web_app:
-    image: manhlinh210/rust_aas_edge_client:amd64-1.0.13
+    image: manhlinh210/rust_aas_edge_client:amd64-1.0.14
     ports:
       - "18000:18000"
     env_file:
