@@ -13,7 +13,8 @@ services:
     volumes:
       - /proc/meminfo:/host_proc/meminfo:ro
       # - ./aas_client.env:/app/aas_client.env
-      - ./scripts/:/app/scripts/
+      - ./mount_volumes/backend/scripts/:/app/scripts/
+      - ./mount_volumes/backend/static/:/app/static/
     networks:               # make it use same network to connect ports
       - edge_network
     depends_on:
@@ -41,8 +42,8 @@ services:
       - "3000:3000"
     volumes:
       - type: bind
-        source: ./react_public/mount_volume
-        target: /app/build/mount_volume
+        source: ./mount_volumes/frontend/
+        target: /app/build/mount_volume/
     networks:
       - edge_network
 

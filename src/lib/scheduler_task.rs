@@ -20,6 +20,7 @@ async fn server_pushing(app_data: web::Data<AppState>,
     submodels_collection_arc: Arc<Mutex<Collection<Document>>>
 ) {
     let submodels_collection = submodels_collection_arc.clone();
+    let offboarding_time = app_data.offboarding_time;
     
     // println!("Task one is running.");
     // Run bash script
@@ -124,10 +125,10 @@ async fn server_pushing(app_data: web::Data<AppState>,
 
         return;
     }
-    else if (boarding_status == "OFFBOARDED") && ((time_now - last_update).num_seconds() < 120){
+    else if (boarding_status == "OFFBOARDED") && ((time_now - last_update).num_seconds() < offboarding_time){
         return ;
     }
-    else if (boarding_status == "OFFBOARDED") && ((time_now - last_update).num_seconds() >= 120){
+    else if (boarding_status == "OFFBOARDED") && ((time_now - last_update).num_seconds() >= offboarding_time){
         let managed_device_json = json!({
             "BoardingStatus": "ONBOARDED",
             "LastUpdate": time_now.to_rfc3339()
