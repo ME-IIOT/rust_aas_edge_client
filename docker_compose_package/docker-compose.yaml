@@ -5,14 +5,14 @@ networks:
 
 services:
   actix_web_app:
-    image: manhlinh210/rust_aas_edge_client:amd64-1.0.9
+    image: manhlinh210/rust_aas_edge_client:amd64-1.0.13
     ports:
       - "18000:18000"
     env_file:
       - aas_client.env
     volumes:
       - /proc/meminfo:/host_proc/meminfo:ro
-      - ./aas_client.env:/app/aas_client.env
+      # - ./aas_client.env:/app/aas_client.env
       - ./scripts/:/app/scripts/
     networks:               # make it use same network to connect ports
       - edge_network
@@ -32,15 +32,17 @@ services:
 
   react-app:
     container_name: react-app
-    image: khaiyacoub/aas-lni-react-app:amd64v8-3.1.0
+    # image: khaiyacoub/aas-lni-react-app:amd64v8-3.1.0
+    image: khaiyacoub/lni-aas-react-app:amd64-3.2.0
     depends_on:
       - mongodb
       - actix_web_app
     ports:
       - "3000:3000"
-    # environment:
-    #   - REACT_APP_API_BASE_URL=http://web:18000
-    #   - REACT_APP_MAIN_COLOR="#37A40D"
+    volumes:
+      - type: bind
+        source: ./react_public/mount_volume
+        target: /app/build/mount_volume
     networks:
       - edge_network
 
