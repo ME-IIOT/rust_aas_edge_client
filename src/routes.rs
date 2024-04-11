@@ -37,6 +37,9 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 .route(web::get().to(handlers::openapi::openapi_endpoint)))
         .service(
             web::resource("/").route(web::get().to(handlers::home::index))
+        )
+        .service(
+            web::resource("/thumbnail").route(web::get().to(handlers::thumbnail::get_thumbnail))
         );
 
 }

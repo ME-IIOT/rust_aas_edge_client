@@ -256,6 +256,8 @@ pub async fn edge_device_onboarding(
             response.status()
         )));
     }
+    
+    collecting_thumbnail_image(&aas_id_short, &aasx_server, &aas_uid).await?;
 
     onboarding_managed_device(
         &aas_id_short, 
@@ -265,6 +267,47 @@ pub async fn edge_device_onboarding(
     ).await;
 
     Ok(())
+}
+
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+
+async fn collecting_thumbnail_image(
+    aas_id_short: &str,
+    aasx_server_url: &str,
+    aas_uid: &str
+) -> Result<(), actix_web::Error> {
+    let url = format!(
+        "{}/shells/{}/asset-information/thumbnail",
+        aasx_server_url,
+        base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD)
+    );
+
+    let client: reqwest::Client = reqwest::Client::new();
+    let mut response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    // Ensure the request was successful and returned a status code of 200 OK
+    if response.status().is_success() {
+        // Ensure the directory exists
+        tokio::fs::create_dir_all("./static/asset_images/").await.map_err(actix_web::Error::from)?;
+
+        // Open a file in write mode
+        let image_name = format!("./static/asset_images/{}.png", aas_id_short);
+        let mut file = File::create(image_name).await.map_err(actix_web::Error::from)?;
+
+        // Stream the bytes directly into the file
+        while let Some(chunk) = response.chunk().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))? { // Corrected error handling here
+            file.write_all(&chunk).await.map_err(actix_web::Error::from)?;
+        }
+        println!("Successfully retrieved image");
+        Ok(())
+    } else {
+        Err(actix_web::error::ErrorInternalServerError("Failed to retrieve image"))
+    }
 }
 
 async fn onboarding_managed_device(

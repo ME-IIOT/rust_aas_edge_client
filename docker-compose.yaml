@@ -6,7 +6,7 @@ networks:
 services:
   mongodb:
     image: mongo:4.4
-    container_name: rust_web_mongo-4.4
+    container_name: rust_web_mongo_dev-4.4
     ports:
       - "27015:27017"
     volumes:

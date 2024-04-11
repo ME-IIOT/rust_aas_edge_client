@@ -82,6 +82,7 @@ async fn main() -> std::io::Result<()> {
     let aas_identifier = env::var("AAS_IDENTIFIER").expect("AAS_IDENTIFIER must be set");
     let aasx_server = env::var("AASX_SERVER").expect("AASX_SERVER must be set");
     let device_name = env::var("DEVICE_NAME").expect("DEVICE_NAME must be set");
+    let offboarding_time = env::var("OFFBOARDING_TIME").expect("OFFBOARDING_TIME must be set").parse::<i64>().expect("OFFBOARDING_TIME must be an integer");
 
     // let db = client.database("bookshelf");
     // Initialize AppState with all necessary data
@@ -92,6 +93,7 @@ async fn main() -> std::io::Result<()> {
         aas_id_short,
         aasx_server,
         device_name,
+        offboarding_time,
     });
 
     let submodels_collection_arc = std::sync::Arc::new(tokio::sync::Mutex::new(submodels_collection));

@@ -8,4 +8,5 @@ pub struct AppState {
     pub aas_id_short: String,
     pub aasx_server: String,
     pub device_name: String,
+    pub offboarding_time: i64,
 }

@@ -44,6 +44,10 @@ COPY --from=builder /rust_web_mongo/target/release/rust_web_mongo /usr/local/bin
 # Set the working directory
 WORKDIR /app
 
+# Copy the static folder to the working directory in the Docker image 
+# /app is working dir, the command is called under app -> /static need to be und /app
+COPY ./static /app/static
+
 # Expose the port on which your server will run
 EXPOSE 18000
 
