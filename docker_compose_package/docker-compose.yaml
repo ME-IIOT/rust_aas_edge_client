@@ -19,6 +19,7 @@ services:
       - edge_network
     depends_on:
       - mongodb
+    restart: always
 
   mongodb:
     image: mongo:4.4.18
@@ -30,6 +31,7 @@ services:
     # restart: always
     networks:               # make it use same network to connect ports
       - edge_network
+    restart: always
 
   react-app:
     container_name: react-app
@@ -46,6 +48,7 @@ services:
         target: /app/build/mount_volume/
     networks:
       - edge_network
+    restart: always
 
   # nginx container service serving the frontend and the backend
   nginx:
@@ -60,3 +63,4 @@ services:
       - react-app
     networks:
       - edge_network
+    restart: always
