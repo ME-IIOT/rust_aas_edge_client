@@ -17,3 +17,4 @@ target/
 # ignore other file
 /db
 /docker_compose_package
+docker-compose.*
