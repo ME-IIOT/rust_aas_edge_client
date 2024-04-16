@@ -1,6 +1,7 @@
 use actix_web::{web, App, HttpServer, middleware::Logger};
 use mongodb;
 use std::env;
+use tokio::time::{self, Duration};
 use actix_cors::Cors;
 
 
@@ -99,14 +100,34 @@ async fn main() -> std::io::Result<()> {
     let submodels_collection_arc = std::sync::Arc::new(tokio::sync::Mutex::new(submodels_collection));
     let shells_collection_arc = std::sync::Arc::new(tokio::sync::Mutex::new(shells_collection));
     
-    if let Err(e) = lib::onboarding::edge_device_onboarding(
-        &app_state.aasx_server,
-        &app_state.aas_identifier,
-        &app_state.aas_id_short,
-        shells_collection_arc.clone(),
-        submodels_collection_arc.clone(),
-    ).await {
-        eprintln!("Failed to onboard submodels: {}", e);
+    // if let Err(e) = lib::onboarding::edge_device_onboarding(
+    //     &app_state.aasx_server,
+    //     &app_state.aas_identifier,
+    //     &app_state.aas_id_short,
+    //     shells_collection_arc.clone(),
+    //     submodels_collection_arc.clone(),
+    // ).await {
+    //     eprintln!("Failed to onboard submodels: {}", e);
+    // }
+    loop {
+        let result = lib::onboarding::edge_device_onboarding(
+            &app_state.aasx_server,
+            &app_state.aas_identifier,
+            &app_state.aas_id_short,
+            shells_collection_arc.clone(),
+            submodels_collection_arc.clone(),
+        ).await;
+    
+        match result {
+            Ok(_) => {
+                println!("Device onboarded successfully!");
+                break
+            }, // Exit loop on success
+            Err(_) => {
+                eprintln!("Failed to onboard device. Retrying in 10 seconds...");
+                time::sleep(Duration::from_secs(10)).await; // Wait for 10 seconds before retrying
+            }
+        }
     }
 
     scheduler_task::submodels_scheduler(app_state.clone(), submodels_collection_arc.clone()).await;

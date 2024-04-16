@@ -352,7 +352,7 @@ async fn onboarding_managed_device(
         &aas_uid, 
         &json
         ).await{
-            Ok(_) => println!("Successful startup onboarding"),
+            Ok(_) => (),
             Err(e) => {
                 eprintln!("Failed to patch submodel: {}", e);
                 return;
