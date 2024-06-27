@@ -8,6 +8,7 @@ use anyhow::Context;
 use tokio;
 use futures;
 use chrono::Utc;
+use actix_web::Error;
 
 use super::aas_interfaces;
 
@@ -68,20 +69,6 @@ async fn fetch_single_submodel(
             .with_context(|| "Failed to convert JSON body to BSON")
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-        // if let mongodb::bson::Bson::Document(document) = bson_value {
-        //     let collection_lock = submodels_collection.lock().await;
-        //     collection_lock.update_one(
-        //         mongodb::bson::doc! { "_id": format!("{}:{}", aas_id_short, submodel_id_short) },
-        //         mongodb::bson::doc! { "$set": document },
-        //         mongodb::options::UpdateOptions::builder().upsert(false).build(),
-        //     ).await
-        //     .with_context(|| "Failed to update submodel in the database")
-        //     .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-
-        //     println!("Successfully fetched submodel: {}", submodel_id_short)
-        // } else {
-        //     return Err(actix_web::error::ErrorInternalServerError("Conversion to Document failed."));
-        // }
         if let mongodb::bson::Bson::Document(document) = bson_value {
             let collection_lock = submodels_collection.lock().await;
             collection_lock.replace_one(
@@ -184,16 +171,7 @@ async fn fetch_all_submodels(
                                         .with_context(|| "Failed to convert submodels dictionary to BSON")
                                         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-    // if let mongodb::bson::Bson::Document(document) = bson_dictionary {
-    //     let collection_lock = submodels_collection.lock().await;
-    //     collection_lock.update_one(
-    //         mongodb::bson::doc! { "_id": format!("{}:submodels_dictionary", aas_id_short) },
-    //         mongodb::bson::doc! { "$set": document  },
-    //         mongodb::options::UpdateOptions::builder().upsert(true).build(),
-    //     ).await
-    //     .with_context(|| "Failed to update submodels dictionary in the database")
-    //     .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-    // }
+    
     if let mongodb::bson::Bson::Document(document) = bson_dictionary {
         let collection_lock = submodels_collection.lock().await;
         collection_lock.replace_one(
@@ -222,6 +200,7 @@ pub async fn edge_device_onboarding(
 
     println!("Fetching URL: {}", url);
 
+    // Request Shell information from the Server
     let client: reqwest::Client = reqwest::Client::new();
     let response: reqwest::Response = client.get(&url).send().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
@@ -240,7 +219,6 @@ pub async fn edge_device_onboarding(
             ).await.map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
         }
         
-
         fetch_all_submodels(
             aasx_server,
             aas_id_short,
@@ -273,39 +251,55 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
 async fn collecting_thumbnail_image(
-    aas_id_short: &str,
-    aasx_server_url: &str,
-    aas_uid: &str
-) -> Result<(), actix_web::Error> {
+    aas_id_short: &str,   // A short ID for the AAS (Asset Administration Shell)
+    aasx_server_url: &str,   // Base URL of the AASX server
+    aas_uid: &str   // UID of the AAS
+) -> Result<(), Error> {
+    // Construct the URL for the thumbnail image
     let url = format!(
         "{}/shells/{}/asset-information/thumbnail",
         aasx_server_url,
-        base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD)
+        base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD) // Encode the AAS UID in a URL-safe manner
     );
 
+    // Create a new HTTP client
     let client: reqwest::Client = reqwest::Client::new();
+    
+    // Send a GET request to the constructed URL
     let mut response = client
         .get(&url)
         .send()
         .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?; // Map any request errors to Actix Web internal server errors
 
     // Ensure the request was successful and returned a status code of 200 OK
     if response.status().is_success() {
-        // Ensure the directory exists
-        tokio::fs::create_dir_all("./static/asset_images/").await.map_err(actix_web::Error::from)?;
+        // Ensure the directory for storing images exists
+        tokio::fs::create_dir_all("./static/asset_images/")
+            .await
+            .map_err(actix_web::Error::from)?; // Convert any errors to Actix Web errors
 
-        // Open a file in write mode
+        // Create a file to store the downloaded image
         let image_name = format!("./static/asset_images/{}.png", aas_id_short);
-        let mut file = File::create(image_name).await.map_err(actix_web::Error::from)?;
+        let mut file = File::create(image_name)
+            .await
+            .map_err(actix_web::Error::from)?; // Convert any errors to Actix Web errors
 
         // Stream the bytes directly into the file
-        while let Some(chunk) = response.chunk().await.map_err(|e| actix_web::error::ErrorInternalServerError(e))? { // Corrected error handling here
-            file.write_all(&chunk).await.map_err(actix_web::Error::from)?;
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))? // Corrected error handling here
+        {
+            file.write_all(&chunk)
+                .await
+                .map_err(actix_web::Error::from)?; // Write each chunk to the file, converting errors
         }
+        
         println!("Successfully retrieved image");
         Ok(())
     } else {
+        // If the response status is not 200 OK, return an internal server error
         Err(actix_web::error::ErrorInternalServerError("Failed to retrieve image"))
     }
 }

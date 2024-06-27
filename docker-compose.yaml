@@ -22,7 +22,7 @@ services:
       - edge_network
     depends_on:
       - mongodb
-    restart: always
+    #restart: always
 
   mongodb:
     image: mongo:4.4.18

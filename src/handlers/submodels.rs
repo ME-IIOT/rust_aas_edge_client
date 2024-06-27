@@ -3,12 +3,12 @@ use mongodb::{bson::Document, Collection};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use serde_json::{json, Value};
-use chrono;
+use chrono::Utc;
 use futures::future::try_join_all;
 use std::collections::HashMap;
 
 
-use crate::lib::aas_interfaces;
+use crate::functions::aas_interfaces;
 use crate::state::AppState;
 
 pub async fn get_submodels(
@@ -79,22 +79,13 @@ pub async fn patch_submodel(
     // To modify the `json` value, work with its inner `Value` directly
     let mut json = json.into_inner();
 
-    // add more submodels to the list if needed (can move it to AppState if needed in future)
-    let submodel_id_short_list = vec!["SystemInformation",
-                                                 "NetworkConfiguration"];
-    if submodel_id_short_list.contains(&submodel_id_short.as_str()){
-        json["LastUpdate"] = json!(chrono::Utc::now().to_rfc3339());
+    // Check if key "LastUpdate" exists in the JSON object. If it does, update it with the current time
+    if let Some(last_update) = json.get_mut("LastUpdate") {
+        *last_update = json!(Utc::now().to_rfc3339());
     }
     
     // using get_ref() to get the reference to the inner data
     let submodels_collection = submodels_collection_arc.get_ref().clone();
-    // let aas_submodel = match aas_interfaces::patch_submodel_database(submodels_collection, 
-    //                                     &app_data.aas_id_short, 
-    //                                     &submodel_id, 
-    //                                     json).await{
-    //     Ok(aas_submodel) => aas_submodel,
-    //     Err(e) => return actix_web::HttpResponse::InternalServerError().body(format!("Error patching submodel: {}", e)),
-    // };
 
     match aas_interfaces::patch_submodel_database(
         submodels_collection, 

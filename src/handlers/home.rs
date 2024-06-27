@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use std::sync::Arc;
 
 use crate::state::AppState;
-use crate::lib::aas_interfaces;
+use crate::functions::aas_interfaces;
 
 // GUIDE: parameter name of web::Data muss be the same as the one in main.rs (example app_state, submodels_collection_arc)
 pub async fn index(

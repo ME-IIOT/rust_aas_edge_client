@@ -15,11 +15,10 @@ use reqwest;
 
 // Adjusted to return a Result<Value, String> to better handle success and error states.
 pub async fn aas_find_one(
-    _id: String, 
-    // collection: mongodb::Collection<mongodb::bson::Document>
+    _id: String, // composite ID for the submodel using AAS ID and submodel ID
     submodels_collection_arc: Arc<Mutex<Collection<Document>>>
 ) 
-    -> Result<mongodb::bson::Document, String> {
+    -> Result<Document, String> {
     let submodels_collection_lock = submodels_collection_arc.lock().await;
     // println!("Finding document with id: {}", _id);
     let filter = doc! { "_id": &_id };
@@ -36,9 +35,10 @@ pub async fn aas_find_one(
     }
 }
 
-pub async fn aas_update_one(_id: String, 
+pub async fn aas_update_one(
+    _id: String, // composite ID for the submodel using AAS ID and submodel ID
     submodels_collection: Arc<Mutex<Collection<Document>>>, 
-    new_document: Document, upsert: bool) 
+    new_document: Document, upsert: bool) // Document to be upserted
     -> Result<String, String> 
 {
     
@@ -80,35 +80,39 @@ pub async fn get_submodel_database(
 }
 
 pub async fn patch_submodel_database(
-    submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
-    aas_id_short: &str,
-    submodel_id_short: &str,
-    // json: &web::Json<Value> // Use reference since content of json is not changed
-    json: &Value
+    submodels_collection_arc: Arc<Mutex<Collection<Document>>>, // Arc and Mutex for thread-safe shared access to the MongoDB collection
+    aas_id_short: &str,    // Short ID for the AAS (Asset Administration Shell)
+    submodel_id_short: &str,  // Short ID for the submodel
+    json: &Value  // JSON data to be patched into the submodel
 ) -> Result<String, String> {
     
+    // Clone the Arc to get a second reference to the collection
     let second_submodels_collection_arc = submodels_collection_arc.clone();
+    // Create a composite ID for the submodel using AAS ID and submodel ID
     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
 
+    // Retrieve the existing submodel document from the database
     let aas_submodel_result = aas_find_one(_id_submodel.clone(), submodels_collection_arc.clone()).await;
     let aas_submodel = match aas_submodel_result {
         Ok(aas_submodel) => aas_submodel,
-        Err(e) => return Err(format!("Error getting submodel: {}", e)),
+        Err(e) => return Err(format!("Error getting submodel: {}", e)),  // Return an error if submodel retrieval fails
     };
 
-    let mut patch_document: mongodb::bson::Document = match mongodb::bson::to_document(&json) {
+    // Parse the JSON request body into a BSON document
+    let mut patch_document: Document = match mongodb::bson::to_document(&json) {
         Ok(document) => document,
-        Err(e) => return Err(format!("Error parsing request body: {}", e)),
+        Err(e) => return Err(format!("Error parsing request body: {}", e)),  // Return an error if parsing fails
     };
 
+    // Merge the existing submodel document with the patch document
     let merged_doc = merge_documents(&aas_submodel, &mut patch_document);
 
+    // Update the submodel document in the database with the merged document
     let update_result = aas_update_one(_id_submodel, second_submodels_collection_arc.clone(), merged_doc, false).await;
     match update_result {
-        Ok(message) => Ok(message),
-        Err(e) => Err(format!("Error patching submodel: {}", e)),
+        Ok(message) => Ok(message),  // Return a success message if the update is successful
+        Err(e) => Err(format!("Error patching submodel: {}", e)),  // Return an error if the update fails
     }
-
 }
 
 fn merge_documents(old_doc: &Document, new_doc: &Document) -> Document {
@@ -135,34 +139,39 @@ fn merge_documents(old_doc: &Document, new_doc: &Document) -> Document {
 
 
 pub async fn patch_submodel_server(
-    submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<Collection<Document>>>,
-    aas_id_short: &str,
-    submodel_id_short: &str,
-    aasx_server_url: &str,
-    aas_uid: &str,
-    // json: &web::Json<Value>, // Use reference since content of json is not changed
-    json: &Value
+    submodels_collection_arc: Arc<Mutex<Collection<Document>>>, // Arc and Mutex for thread-safe shared access to the MongoDB collection
+    aas_id_short: &str,    // Short ID for the AAS (Asset Administration Shell)
+    submodel_id_short: &str,  // Short ID for the submodel
+    aasx_server_url: &str,    // Base URL of the AASX server
+    aas_uid: &str,    // UID of the AAS
+    json: &Value  // JSON data to be patched into the submodel
 ) -> Result<String, String> {
-    // let submodels_collection_lock = submodels_collection_arc.lock().await;
+    // Create a composite ID for the submodel using AAS ID and submodel ID
     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
 
+    // Retrieve the existing submodel document from the database
     let submodels_collection = submodels_collection_arc.clone();
     let aas_submodel = aas_find_one(_id_submodel, submodels_collection_arc.clone()).await
         .map_err(|e| format!("Error getting submodel: {}", e))?;
 
+    // Parse the JSON request body into a BSON document
     let mut patch_document: Document = mongodb::bson::to_document(&json)
         .map_err(|e| format!("Error parsing request body: {}", e))?;
 
+    // Merge the existing submodel document with the patch document
     let merged_doc = merge_documents(&aas_submodel, &mut patch_document);
     
-    // let submodels_collection = submodels_collection_arc.clone();
+    // Retrieve the submodels dictionary from the database
     let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection.clone()).await
         .map_err(|e| format!("Error getting submodels dictionary: {}", e))?;
 
+    // Extract the submodel UID from the dictionary
     let submodel_uid = submodels_dictionary.get_str(submodel_id_short)
         .map_err(|_| "Submodel not found in dictionary".to_string())?;
 
+    // Create a new HTTP client
     let client = reqwest::Client::new();
+    // Construct the URL for the submodel value endpoint
     let url = format!(
         "{}shells/{}/submodels/{}/$value",
         aasx_server_url,
@@ -170,24 +179,27 @@ pub async fn patch_submodel_server(
         base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD),
     );
 
+    // Send a PATCH request to the submodel value endpoint
     let response = client.patch(&url)
         .json(&merged_doc)
         .send()
         .await
         .map_err(|e| format!("Error sending patch request: {}", e))?;
 
+    // Check the response status code and return appropriate message
     match response.status() {
-        reqwest::StatusCode::NO_CONTENT => Ok("Submodel patched successfully".into()),
-        _ => Err(response.text().await.unwrap_or_else(|_| "Unknown error".into())),
+        reqwest::StatusCode::NO_CONTENT => Ok("Submodel patched successfully".into()),  // Return success message if status is 204 No Content
+        _ => Err(response.text().await.unwrap_or_else(|_| "Unknown error".into())),  // Return error message if status is not 204
     }
 }
+
 
 pub async fn fetch_single_submodel_from_server(
     aasx_server_url: &str,
     aas_id_short: &str,
     aas_uid: &str,
     submodel_id_short: &str,
-    submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<Collection<Document>>>
+    submodels_collection_arc: Arc<Mutex<Collection<Document>>>
 ) -> Result<(), String> {
     // let submodels_collection_lock = submodels_collection_arc.lock().await;
     let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), 
@@ -202,8 +214,6 @@ pub async fn fetch_single_submodel_from_server(
         },
         Err(e) => return Err(format!("Error getting submodels dictionary: {}", e)),
     };
-
-
 
     let client = reqwest::Client::new();
     let submodel_value_url = format!(
@@ -251,9 +261,9 @@ pub async fn fetch_single_submodel_from_server(
 }
 
 pub async fn read_managed_device(
-    submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
+    submodels_collection_arc: Arc<Mutex<Collection<Document>>>,
     aas_id_short: &str
-) -> Result<mongodb::bson::Document, String> {
+) -> Result<Document, String> {
     let table_id = format!("{}:{}", aas_id_short, "ManagedDevice");
     
     let managed_device = aas_find_one(table_id, submodels_collection_arc.clone()).await;
@@ -262,110 +272,3 @@ pub async fn read_managed_device(
         Err(e) => Err(format!("Failed to find managed device: {}", e)),
     }
 }
-// No need 
-// pub fn aas_sm_2_client_json(submodel_elements: Vec<mongodb::bson::Document>) -> mongodb::bson::Document {
-//     let mut client_json = mongodb::bson::Document::new();
-
-//     for element in submodel_elements {
-//         if let Some(model_type) = element.get_str("modelType").ok() {
-//             match model_type {
-//                 "MultiLanguageProperty" => {
-//                     if let Some(values) = element.get_array("value").ok() {
-//                         let mut language_json = mongodb::bson::Document::new();
-//                         for value in values {
-//                             if let Bson::Document(value_doc) = value {
-//                                 if let (Ok(language), Ok(text)) = (value_doc.get_str("language"), value_doc.get_str("text")) {
-//                                     language_json.insert(language, text);
-//                                 }
-//                             }
-//                         }
-//                         if let Ok(id_short) = element.get_str("idShort") {
-//                             client_json.insert(id_short, mongodb::bson::Bson::Document(language_json));
-//                         }
-//                     }
-//                 },
-//                 "Property" => {
-//                     if let (Ok(id_short), Some(value)) = (element.get_str("idShort"), element.get("value")) {
-//                         client_json.insert(id_short, value.clone());
-//                     }
-//                 },
-//                 "SubmodelElementCollection" => {
-//                     if let Ok(id_short) = element.get_str("idShort") {
-//                         if let Some(values) = element.get_array("value").ok() {
-//                             let nested_elements: Vec<mongodb::bson::Document> = values.iter().filter_map(|v| {
-//                                 if let Bson::Document(doc) = v {
-//                                     Some(doc.clone())
-//                                 } else {
-//                                     None
-//                                 }
-//                             }).collect();
-                            
-//                             client_json.insert(id_short, mongodb::bson::Bson::Document(aas_sm_2_client_json(nested_elements)));
-//                         }
-//                     }
-//                 },
-//                 _ => {}
-//             }
-//         }
-//     }
-
-//     client_json
-// }
-
-// // send  data to server
-// pub async fn patch_submodel_server(
-//     submodels_collection_arc: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
-//     aas_id_short: &str,
-//     submodel_id_short: &str,
-//     aasx_server_url: &str,
-//     aas_uid: &str,
-//     json: web::Json<Value>
-// ) -> Result<String, String> {
-// {
-//     let submodels_collection_lock = submodels_collection_arc.lock().await;
-    
-//     let _id_submodel = format!("{}:{}", aas_id_short, submodel_id_short);
-
-//     let aas_submodel_result = aas_find_one(_id_submodel.clone(), submodels_collection_lock.clone()).await;
-//     let mut aas_submodel = match aas_submodel_result {
-//         Ok(aas_submodel) => aas_submodel,
-//         Err(e) => return Err(format!("Error getting submodel: {}", e)),
-//     };
-
-//     let mut patch_document: mongodb::bson::Document = match mongodb::bson::to_document(&json.0) {
-//         Ok(document) => document,
-//         Err(e) => return Err(format!("Error parsing request body: {}", e)),
-//     };
-
-//     merge_documents(&aas_submodel, &mut patch_document);
-//     let submodels_dictionary = aas_find_one(format!("{}:submodels_dictionary", aas_id_short), submodels_collection_lock.clone()).await;
-//     let submodel_uid = match submodels_dictionary {
-//         Ok(submodels_dictionary) => {
-//             match submodels_dictionary.get(&submodel_id_short) {
-//                 Some(submodel_uid) => submodel_uid,
-//                 None => return Err("Submodel not found in dictionary".into()),
-//             }
-//         },
-//         Err(e) => return Err(format!("Error getting submodels dictionary: {}", e)),
-//     };
-
-//     let client = reqwest::Client::new();
-//     let url = format!(
-//         "{}shells/{}/submodels/{}/$value",
-//         aasx_server_url,
-//         base64::encode_config(aas_uid, base64::URL_SAFE_NO_PAD),
-//         base64::encode_config(submodel_uid, base64::URL_SAFE_NO_PAD)
-//     )
-    
-//     let response = client.patch(&url)
-//         .json(&patch_document)
-//         .send()
-//         .await;
-
-//     if response.status().is_success() {
-//         Ok("Submodel patched successfully".into())
-//     } else {
-//         Err(format!("Error patching submodel: {:?}", response))
-//     }
-// }
-// }

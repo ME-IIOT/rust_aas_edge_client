@@ -1,15 +1,13 @@
 use actix_web::{web, App, HttpServer, middleware::Logger};
 use mongodb;
-use std::env;
+use std::{env, sync::Arc};
 use tokio::time::{self, Duration};
 use actix_cors::Cors;
+use tokio::sync::Mutex;
 
-
-async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson::Document>, mongodb::Collection<mongodb::bson::Document>) {
-    let database_url = std::env::var("MONGO_URI").expect("MONGO_URI must be set");
-
+async fn init_mongodb(mongo_uri: String) -> (mongodb::Database, mongodb::Collection<mongodb::bson::Document>, mongodb::Collection<mongodb::bson::Document>) {
     // Parse the MongoDB connection string into client options, panicking on failure.
-    let client_options = mongodb::options::ClientOptions::parse(&database_url).await
+    let client_options = mongodb::options::ClientOptions::parse(&mongo_uri).await
         .expect("Failed to parse MongoDB URI into client options");
 
     // Attempt to create a MongoDB client with the specified options, panicking on failure.
@@ -43,40 +41,24 @@ async fn init_mongodb() -> (mongodb::Database, mongodb::Collection<mongodb::bson
     (db, shells_collection, submodels_collection)
 }
 
-// // Load environment variables from aas_client.env file
-// async fn load_env() {
-//     if let Err(e) = dotenv::from_filename("aas_client.env") {
-//         eprintln!("Error loading .env file: {}", e);
-//     }
-// }
-
-
-
-// GUIDE: include the modules to main
 mod handlers;
 mod routes;
 mod state;
 mod models;
-mod lib;
+mod functions;
 
-use lib::scheduler_task;
+use functions::scheduler_task;
 
 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
-    // Load environment variables from .env file
-    // load_env().await;
-    
     // GUIDE: set env var for logging
     std::env::set_var("RUST_LOG", "actix_web=info");
     std::env::set_var("RUST_BACKTRACE", "1");
     // GUIDE: add logger
     env_logger::init();
 
-    let (db, shells_collection, submodels_collection) = init_mongodb().await;
-        
     // Fetch the environment variables
     let mongo_uri = env::var("MONGO_URI").expect("MONGO_URI must be set");
     let aas_id_short = env::var("AAS_IDSHORT").expect("AAS_IDSHORT must be set");
@@ -85,7 +67,11 @@ async fn main() -> std::io::Result<()> {
     let device_name = env::var("DEVICE_NAME").expect("DEVICE_NAME must be set");
     let offboarding_time = env::var("OFFBOARDING_TIME").expect("OFFBOARDING_TIME must be set").parse::<i64>().expect("OFFBOARDING_TIME must be an integer");
 
-    // let db = client.database("bookshelf");
+    // Initialize MongoDB
+    let (db, shells_collection, submodels_collection) = init_mongodb(mongo_uri.clone()).await;
+        
+    
+
     // Initialize AppState with all necessary data
     let app_state = web::Data::new(state::AppState {
         health_check_response: std::sync::Mutex::new(String::from("I'm OK!")),
@@ -97,20 +83,13 @@ async fn main() -> std::io::Result<()> {
         offboarding_time,
     });
 
-    let submodels_collection_arc = std::sync::Arc::new(tokio::sync::Mutex::new(submodels_collection));
-    let shells_collection_arc = std::sync::Arc::new(tokio::sync::Mutex::new(shells_collection));
+    // GUIDE: wrap the collections in an Arc<Mutex<>> to share them between threads
+    let submodels_collection_arc = Arc::new(Mutex::new(submodels_collection));
+    let shells_collection_arc = Arc::new(Mutex::new(shells_collection));
     
-    // if let Err(e) = lib::onboarding::edge_device_onboarding(
-    //     &app_state.aasx_server,
-    //     &app_state.aas_identifier,
-    //     &app_state.aas_id_short,
-    //     shells_collection_arc.clone(),
-    //     submodels_collection_arc.clone(),
-    // ).await {
-    //     eprintln!("Failed to onboard submodels: {}", e);
-    // }
+    // Onboard the device
     loop {
-        let result = lib::onboarding::edge_device_onboarding(
+        let result = functions::onboarding::edge_device_onboarding(
             &app_state.aasx_server,
             &app_state.aas_identifier,
             &app_state.aas_id_short,
@@ -132,19 +111,8 @@ async fn main() -> std::io::Result<()> {
 
     scheduler_task::submodels_scheduler(app_state.clone(), submodels_collection_arc.clone()).await;
     
-    // CORS setup
-    // let cors = Cors::default()
-    //     .allow_any_origin()
-    //     .allow_any_method()
-    //     .allow_any_header();
-    
-    
     HttpServer::new(move || {
         let cors = Cors::default()
-            // .allowed_origin("https://example.com") // Allow only a specific domain
-            // .allowed_methods(vec!["GET", "POST", "PATCH", "PUT"]) // Allow only specific methods
-            // .allowed_headers(vec![actix_web::http::header::AUTHORIZATION, actix_web::http::header::ACCEPT])
-            // .allowed_header(actix_web::http::header::CONTENT_TYPE)
             .allow_any_origin()
             .allow_any_method()
             .allow_any_header()
