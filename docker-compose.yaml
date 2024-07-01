@@ -4,24 +4,35 @@ networks:
   edge_network:
 
 services:
-  actix_web_app:
-    # image: manhlinh210/rust_aas_edge_client:amd64-1.0.14
+  aas-client-service:
+    container_name: aas-client-service 
     build: 
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     ports:
       - "18000:18000"
     env_file:
-      - aas_client.env
+      - ./backend/aas_client.env
     volumes:
       - /proc/meminfo:/host_proc/meminfo:ro
-      # - ./aas_client.env:/app/aas_client.env
-      - ./mount_volumes/backend/scripts/:/app/scripts/
-      - ./mount_volumes/backend/static/:/app/static/
     networks:               # make it use same network to connect ports
       - edge_network
     depends_on:
       - mongodb
+    #restart: always
+
+  device-web-ui:
+    container_name: device-web-ui
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - mongodb
+      - aas-client-service
+    ports:
+      - "3000:3000"
+    networks:
+      - edge_network
     #restart: always
 
   mongodb:
@@ -34,24 +45,7 @@ services:
     # restart: always
     networks:               # make it use same network to connect ports
       - edge_network
-    restart: always
-
-  react-app:
-    container_name: react-app
-    # image: khaiyacoub/aas-lni-react-app:amd64v8-3.1.0
-    image: khaiyacoub/lni-aas-react-app:amd64-3.3.0
-    depends_on:
-      - mongodb
-      - actix_web_app
-    ports:
-      - "3000:3000"
-    volumes:
-      - type: bind
-        source: ./mount_volumes/frontend/
-        target: /app/build/mount_volume/
-    networks:
-      - edge_network
-    restart: always
+    #restart: always
 
   # nginx container service serving the frontend and the backend
   nginx:
@@ -62,8 +56,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
     depends_on:
-      - actix_web_app
-      - react-app
+      - aas-client-service
+      - device-web-ui
     networks:
       - edge_network
-    restart: always
+    #restart: always
