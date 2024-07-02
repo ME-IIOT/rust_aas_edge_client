@@ -1,3 +1,4 @@
+// Author: Pham-Minh-Khai Hoang (khai.hoang@yacoub.de)
 import React from "react";
 import { Box } from "@mui/material";
 import SidebarItem from "./SidebarItem";

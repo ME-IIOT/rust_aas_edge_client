@@ -1,3 +1,4 @@
+// Author: Pham-Minh-Khai Hoang (khai.hoang@yacoub.de)
 import React from "react";
 import TimeSeriesChart from "../charts/TimeSeriesChart";
 import ChartContainer from "./ChartContainer";

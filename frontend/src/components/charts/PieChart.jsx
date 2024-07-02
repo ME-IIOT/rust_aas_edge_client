@@ -1,3 +1,4 @@
+// Author: Pham-Minh-Khai Hoang (khai.hoang@yacoub.de)
 import React from 'react';
 import { PieChart as RePieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { useTheme } from '@emotion/react';

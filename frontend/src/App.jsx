@@ -1,3 +1,4 @@
+// Author: Pham-Minh-Khai Hoang (khai.hoang@yacoub.de)
 import React, { useEffect} from "react";
 import { useDispatch } from 'react-redux';
 import { ThemeProvider } from "@emotion/react";

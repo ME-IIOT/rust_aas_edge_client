@@ -1,3 +1,4 @@
+// Author: Pham-Minh-Khai Hoang (khai.hoang@yacoub.de)
 import React from "react";
 import styled from "@emotion/styled";
 import { Avatar, Menu, MenuItem, Button, Typography } from "@mui/material";

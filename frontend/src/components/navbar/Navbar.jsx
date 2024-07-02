@@ -1,3 +1,4 @@
+// Author: Pham-Minh-Khai Hoang (khai.hoang@yacoub.de)
 import React, { useState, useEffect } from "react";
 import styled from "@emotion/styled";
 import { AppBar, Toolbar } from "@mui/material";

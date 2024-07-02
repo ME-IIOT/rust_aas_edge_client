@@ -1,9 +1,4 @@
-// Authors: Manh-Linh Phan (manh.linh.phan@yacoub.de), Xuan-Thuy Dang (xuan.thuy.dang@yacoub.de), Markus Rentschler
-
-
-// Authors: Manh-Linh Phan (manh.linh.phan@yacoub.de), Xuan-Thuy Dang (xuan.thuy.dang@yacoub.de), Markus Rentschler
-
-
+// Authors: Manh-Linh Phan (manh.linh.phan@yacoub.de)
 use actix_web::web;
 use chrono::{DateTime, Utc};
 use clokwerk::{Scheduler, TimeUnits};
@@ -38,6 +33,7 @@ async fn update_submodel_database(
     Ok(())
 }
 
+// Push JSON payload to AAS submodel repository
 async fn update_submodel_server(
     submodels_collection: Arc<Mutex<Collection<Document>>>,
     app_data: &AppState,

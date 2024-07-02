@@ -1,3 +1,4 @@
+// Author: Pham-Minh-Khai Hoang (khai.hoang@yacoub.de)
 import axios from 'axios';
 
 export const ApiService = (customConfig) => {
