@@ -15,6 +15,8 @@ services:
       - ./backend/aas_client.env
     volumes:
       - /proc/meminfo:/host_proc/meminfo:ro
+      - ./backend/scripts/:/app/scripts/
+      - ./backend/static/:/app/static/
     networks:               # make it use same network to connect ports
       - edge_network
     depends_on:
@@ -31,6 +33,10 @@ services:
       - aas-client-service
     ports:
       - "3000:3000"
+    volumes:
+      - type: bind
+        source: ./frontend/public/mount_volume/
+        target: /app/build/mount_volume/
     networks:
       - edge_network
     #restart: always
