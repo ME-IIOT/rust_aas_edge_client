@@ -12,6 +12,7 @@ The source code licenced under Creative Commons Attribution-NonCommercial-ShareA
 Public License.
 
 Publisher: Murrelektronik GmbH
+
 Authors and Contributors: 
 * Markus Rentschler, Xuan-Thuy Dang, Manh Linh Phan and Pham Minh Khai Hoang, Murrelektronik GmbH
 
