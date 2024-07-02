@@ -8,7 +8,7 @@ The application includes two part, a backend and a frontend. The backend collect
 and periodically synchronizes these information with AAS servers using AAS API v3. It also exposes REST API for the frontend component to allow 
 changing certain device configuration and showing real-time device status information.
 
-The source code licenced under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+The source code is licenced under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
 Public License.
 
 Publisher: Murrelektronik GmbH
