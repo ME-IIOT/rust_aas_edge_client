@@ -17,9 +17,17 @@ device state synchronized. Device information is kept in a local database.
 
 ### Rest API Module
 The Rest API provide interface to the frontend. Rest API endpoints and logic are implemented in various "handlers".
-The Rest Server is implemented "API-driven". That means an Open API Specs (OAS v3) must be provided, which describe all 
-endpoints, theirs methods and objects. He we reuse the JSON objects tha are also returned from AAS (Asset, submodel, etc) to eliminate the need 
-to transform AAS data objects to another local objects to store device data.
+
+REST Endpoint:
+
+/submodels/{Submodel-Short-ID}
+
+Submodel-Short-ID: SystemInformation, NetworkConfiguration, ManagedDevice, Nameplate
+
+GET: Retrieve the current of submodel from the database
+
+PATCH: Update the new value for the submodel to the database
+
 
 
 ## Rust Source Code
@@ -67,15 +75,6 @@ In main.rs:
 * Start a Thread for interval polling from AAS Server and pushing device data to AAS Server
 
 * Start EdgeClient-Server and expose to port 18000.
-
-### REST Endpoint:
-/submodels/{Submodel-Short-ID}
-
-Submodel-Short-ID: SystemInformation, NetworkConfiguration, ManagedDevice, Nameplate
-
-GET: Retrieve the current of submodel from the database
-
-PATCH: Update the new value for the submodel to the database
 
 ### 1st time Onboarding (Startup EdgeClient container)
 
