@@ -21,6 +21,8 @@ jobs:
             runner_label: 'ubuntu-latest'
           - docker_platform: 'linux/arm64/v8'
             runner_label: 'self-hosted' # Label for your self-hosted ARM runner
+          - docker_platform: 'linux/arm/v7'
+            runner_label: 'self-hosted' # Label for your self-hosted ARM runner
       fail-fast: false
     steps:
       - name: Check out the repo
@@ -88,6 +90,8 @@ jobs:
           elif [ "${{ matrix.docker_platform }}" == "linux/amd64" ]; then
             echo "TAG_SUFFIX=amd64-${{ env.NEXT_VERSION }}" >> $GITHUB_ENV
           # Add more architectures here
+          elif [ "${{ matrix.docker_platform }}" == "linux/arm/v7" ]; then
+            echo "TAG_SUFFIX=arm32-${{ env.NEXT_VERSION }}" >> $GITHUB_ENV
           else
             echo "TAG_SUFFIX=unknown-${{ env.NEXT_VERSION }}" >> $GITHUB_ENV
           fi

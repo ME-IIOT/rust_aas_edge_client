@@ -11,6 +11,7 @@ use crate::functions::{aas_interfaces, bash_command};
 use crate::state::AppState;
 
 fn parse_date_time_from_string(date_time_str: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
+    println!("Parsing date time from string: {}", date_time_str);
     let date_time = DateTime::parse_from_rfc3339(date_time_str)?;
     Ok(date_time.with_timezone(&Utc))
 }
