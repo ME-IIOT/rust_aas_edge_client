@@ -48,7 +48,7 @@ async fn update_submodel_server(
         json,
     )
     .await
-    .map_err(|e| anyhow::anyhow!("Failed to patch submodel to server: {}", e))?;
+    .map_err(|e| anyhow::anyhow!("Failed to patch submodel to AAS server: {}", e))?;
     Ok(())
 }
 
@@ -128,6 +128,7 @@ async fn server_pushing(
     let boarding_status = managed_device.get("BoardingStatus").and_then(|status| status.as_str()).unwrap_or("UNKNOWN");
     let last_update_str = managed_device.get("LastUpdate").and_then(|update| update.as_str()).unwrap_or("UNKNOWN");
 
+    // eprint!("Boarding status: {}, Last update: {}. ", boarding_status, last_update_str);
     let last_update = match parse_date_time_from_string(last_update_str) {
         Ok(last_update) => last_update,
         Err(e) => {

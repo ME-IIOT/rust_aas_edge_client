@@ -28,7 +28,7 @@ display_system_info() {
     DISK_FREE=$(df -H --output=avail / | tail -n 1 | awk '{print $1}')
 
     # Board Temperature - Assuming a static value
-    BOARD_TEMPERATURE="42°C"  
+    BOARD_TEMPERATURE="41°C"  
 
     # Output as JSON
     echo -e "{

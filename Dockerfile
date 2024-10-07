@@ -2,8 +2,8 @@
 FROM rust:1.76 as builder
 
 # Create a new binary project
-RUN USER=root cargo new --bin rust_web_mongo
-WORKDIR /rust_web_mongo
+RUN USER=root cargo new --bin rust_aas_client
+WORKDIR /rust_aas_client
 
 # Copy the Cargo.toml and Cargo.lock files into the container
 COPY ./Cargo.toml ./Cargo.lock ./
@@ -39,7 +39,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from the builder stage to the runtime stage
-COPY --from=builder /rust_web_mongo/target/release/rust_web_mongo /usr/local/bin/
+COPY --from=builder /rust_aas_client/target/release/rust_aas_client /usr/local/bin/
 
 # Set the working directory
 WORKDIR /app
@@ -52,4 +52,4 @@ COPY ./static /app/static
 EXPOSE 18000
 
 # Command to run the binary
-CMD ["/usr/local/bin/rust_web_mongo"]
+CMD ["/usr/local/bin/rust_aas_client"]

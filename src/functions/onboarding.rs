@@ -237,12 +237,21 @@ pub async fn edge_device_onboarding(
     
     collecting_thumbnail_image(&aas_id_short, &aasx_server, &aas_uid).await?;
 
-    onboarding_managed_device(
+    let result = onboarding_managed_device(
         &aas_id_short, 
         &aasx_server, 
         &aas_uid, 
         submodels_collection.clone()
     ).await;
+
+    match result {
+        Ok(_) => {
+            println!("Device onboarded successfully!");
+        },
+        Err(e) => {
+            return Err(actix_web::error::ErrorInternalServerError(e));
+        }
+    }
 
     Ok(())
 }
@@ -299,8 +308,10 @@ async fn collecting_thumbnail_image(
         println!("Successfully retrieved image");
         Ok(())
     } else {
-        // If the response status is not 200 OK, return an internal server error
-        Err(actix_web::error::ErrorInternalServerError("Failed to retrieve image"))
+        // If the response status is not 200 OK, return a message 
+        // Err(actix_web::error::ErrorInternalServerError("Failed to retrieve image"))
+        eprintln!("Failed to retrieve image");
+        Ok(())
     }
 }
 
@@ -309,14 +320,14 @@ async fn onboarding_managed_device(
     aasx_server_url: &str,
     aas_uid: &str,
     submodels_collection: std::sync::Arc<tokio::sync::Mutex<mongodb::Collection<mongodb::bson::Document>>>,
-){
+) -> Result<(), actix_web::Error> {
     match aas_interfaces::read_managed_device(
         submodels_collection.clone(), 
         aas_id_short).await{
         Ok(_) => (),
         Err(e) => {
             eprintln!("Failed to read managed device: {}", e);
-            return;
+            return Err(actix_web::error::ErrorInternalServerError(e));
         }
     };
     
@@ -333,8 +344,8 @@ async fn onboarding_managed_device(
         &json).await{
             Ok(_) => (),
             Err(e) => {
-                eprintln!("Failed to patch submodel: {}", e);
-                return;
+                eprintln!("Failed Onboarding because of error by patch submodel to database: {}", e);
+                return Err(actix_web::error::ErrorInternalServerError(e));
             }
     };
 
@@ -348,10 +359,12 @@ async fn onboarding_managed_device(
         ).await{
             Ok(_) => (),
             Err(e) => {
-                eprintln!("Failed to patch submodel: {}", e);
-                return;
+                eprintln!("Failed Onboarding because of error by patch submodel to AAS Server: {}", e);
+                return Err(actix_web::error::ErrorInternalServerError(e));
         }
     };
+
+    return Ok(());
 }
 
 fn extract_submodels_id(data: &mongodb::bson::Document) -> Result<Vec<String>, actix_web::Error> {

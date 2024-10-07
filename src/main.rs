@@ -100,10 +100,10 @@ async fn main() -> std::io::Result<()> {
         match result {
             Ok(_) => {
                 println!("Device onboarded successfully!");
-                break
-            }, // Exit loop on success
-            Err(_) => {
-                eprintln!("Failed to onboard device. Retrying in 10 seconds...");
+                break; // Exit loop on success
+            },
+            Err(err) => {
+                eprintln!("Failed to onboard device: {}. \nRetrying in 10 seconds...", err);
                 time::sleep(Duration::from_secs(10)).await; // Wait for 10 seconds before retrying
             }
         }
