@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - build
+      - build_SPS24
 
 jobs:
   build-push:
