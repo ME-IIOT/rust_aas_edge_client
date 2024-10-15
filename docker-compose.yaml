@@ -5,10 +5,10 @@ networks:
 
 services:
   actix_web_app:
-    # image: manhlinh210/rust_aas_edge_client:amd64-1.0.14
-    build: 
-      context: .
-      dockerfile: Dockerfile
+    image: manhlinh210/rust_aas_edge_client:amd64-1.0.19
+    # build: 
+    #   context: .
+    #   dockerfile: Dockerfile
     ports:
       - "18000:18000"
     env_file:
@@ -20,21 +20,21 @@ services:
       - ./mount_volumes/backend/static/:/app/static/
     networks:               # make it use same network to connect ports
       - edge_network
-    depends_on:
-      - mongodb
+    # depends_on:
+    #   - mongodb
     #restart: always
 
-  mongodb:
-    image: mongo:4.4.18
-    container_name: rust_aas_client-4.4
-    ports:
-      - "27015:27017"
-    volumes:
-      - ./db:/data/db
-    # restart: always
-    networks:               # make it use same network to connect ports
-      - edge_network
-    restart: always
+  # mongodb:
+  #   image: mongo:4.4.18
+  #   container_name: rust_aas_client-4.4
+  #   ports:
+  #     - "27015:27017"
+  #   volumes:
+  #     - ./db:/data/db
+  #   # restart: always
+  #   networks:               # make it use same network to connect ports
+  #     - edge_network
+  #   restart: always
 
   # react-app:
   #   container_name: react-app
@@ -67,3 +67,4 @@ services:
   #   networks:
   #     - edge_network
   #   restart: always
+

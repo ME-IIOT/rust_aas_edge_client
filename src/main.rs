@@ -74,6 +74,8 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // only after is onboarded
+
     scheduler_task::submodels_scheduler(app_state.clone(), rocksdb.clone()).await;
 
     // Start HTTP server
